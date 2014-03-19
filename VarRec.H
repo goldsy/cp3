@@ -28,9 +28,12 @@ class VarRec {
         // Flag indicating if variable is used as a loop counter.
         bool _loop_counter_flag;
 
+        // Const flag indicating a read-only variable. (Const or literal.)
+        bool _const_flag;
+
     public:
         // Default ctor.
-        VarRec(string var_name, TypeRec *var_type);
+        VarRec(string var_name, TypeRec *var_type, bool const_flag = false);
 
         // Class dtor.
         ~VarRec() { };
@@ -39,11 +42,13 @@ class VarRec {
         string get_name();
         TypeRec* get_type();
         bool get_loop_counter_flag();
+        bool is_const();
         // TODO: getter for memory location???
 
 
         // Setters
         void set_loop_counter_flag(bool flag);
+        void set_const_flag(bool flag);
 
         // TODO: setter for memory location???
 
