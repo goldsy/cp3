@@ -170,9 +170,6 @@ var:
 varlist:
        idlist TK_COLON typeid arraydims varlist2
        {
-            //printf("IN VAR\n");
-            //fflush(0);
-
             // First determine the type we are dealing with.
             TypeRec *target_type = 0;
             
@@ -205,9 +202,6 @@ varlist:
 
             for (iter = $<string_list>1->begin(); iter != $<string_list>1->end(); ++iter)
             {
-                //printf("STORING VAR: %s\n", iter->c_str());
-                //fflush(0);
-
                 // Make sure that the ID isn't already in the current scope var list. (i.e. check the return on the insert.)
                 VarRec *temp = new VarRec(*iter, target_type);   
 
@@ -441,31 +435,20 @@ declist:
        }
        | declistx
        {
-            //printf("IN DECLIST\n");
-            //fflush(0);
-
             // Returns the list of variables (i.e. param list) from declistx.
             if (in_proc_defn_flag)
             {
                 // These variables need to be entered in table now.
                 list<VarRec*> *scope_vars = $<var_rec_list>1;
 
-                //printf("SCOPE VARS: %p\n", static_cast<void*>(scope_vars));
-                //fflush(0);
-
                 if (scope_vars)
                 {
                     // Loop through each variable and add them to the var
                     // symbol table.
                     list<VarRec*>::iterator iter;
-                        //printf("INVALIDATION TEST: %lu\n", scope_vars->size());
-                        //cout << "INVALIDATION TEST: " << scope_vars->size() << endl;
 
                     for (iter = scope_vars->begin(); iter != scope_vars->end(); ++iter)
                     {
-                        //printf("ATTEMPTING TO STORE VAR: %s\n", (*iter)->get_name().c_str());
-                        //fflush(0);
-
                         // Attempt to insert each variable check for failure.
                         if( !sm->insert_var(*iter) )
                         {
@@ -476,10 +459,6 @@ declist:
                             yyerror(errorMsg.c_str());
                             exit(0);
                         }
-                        //printf("AFTER INSERT\n");
-                        //fflush(0);
-                        //printf("INVALIDATION TEST: %lu\n", scope_vars->size());
-                        //fflush(0);
                     }
                 }
             }
@@ -493,9 +472,6 @@ declist:
 declistx:
         idlist TK_COLON typeid declistx2
         {
-            //printf("IN DECLISTX\n");
-            //fflush(0);
-
             // Create new list and add ID list to it.
             list<VarRec *> *param_list = new list<VarRec*>();
             list<string>::iterator id_iter;
@@ -503,23 +479,6 @@ declistx:
 
             for (id_iter = $<string_list>1->begin(); id_iter != $<string_list>1->end(); ++id_iter)
             {
-                //printf("STORING PARAM VAR: %s\n", id_iter->c_str());
-                //fflush(0);
-
-                // REMOVED DUP NAME VALIDATION.
-                // NAMES NOT IMPORTANT UNTIL PROC DECLARATION.
-                //param_iter = param_list->find(*id_iter);
-
-                //if (param_iter != param_list->end())
-                //{
-                //    // Parameter name already exists.
-                //    string errorMsg;
-                //    errorMsg = "Duplicate paramter name '";
-                //    errorMsg += *id_iter; 
-                //    errorMsg += "'";
-                //    yyerror(errorMsg.c_str());
-                //    exit(0);
-                //}
                 VarRec *temp = new VarRec(*id_iter, $<type_rec>3);   
                 param_list->push_back(temp);
             }
@@ -532,17 +491,7 @@ declistx:
                 // Copy the sub list to this one.
                 param_list->insert(param_list->end(), sub_param_list->begin(), sub_param_list->end());
 
-                // YOU JUST PAST THE PTRS YOU MORON!!!
-                // Now cleanup the sub list.
-                //list<VarRec *>::iterator sub_param_iter;
-
-                //for (sub_param_iter = sub_param_list->begin(); sub_param_iter != sub_param_list->end(); ++sub_param_iter)
-                //{
-                //    // Delete each entries memory.
-                //    delete *sub_param_iter;
-                //}
-
-                // Delete the list.
+                // Delete the list.  The pointers are now "owned" but the new list.
                 delete sub_param_list;
             }
 
@@ -555,20 +504,8 @@ declistx:
         ;
 
 declistx2:
-         /* empty rule */ 
-         { 
-            //printf("IN DECLISTX2 NULL\n");
-            //fflush(0);
-
-            $$ = 0; 
-         }
-         | TK_COMMA declistx 
-         { 
-            //printf("IN DECLISTX2 RECURSE\n");
-            //fflush(0);
-
-            $$ = $<var_rec_list>2; 
-         }
+         /* empty rule */ { $$ = 0; }
+         | TK_COMMA declistx { $$ = $<var_rec_list>2; }
          ;
 
 
@@ -884,9 +821,6 @@ procentry:
 prochelper:
           /* empty rule */
           {
-            //printf("IN PROC HELPER\n");
-            //fflush(0);
-
             // stuff the return variable in the table.
             if ($<type_rec>0)
             {
@@ -908,9 +842,6 @@ prochelper:
 
             if (stored_proc)
             {
-                //printf("FOUND STORED PROC %s\n", proc_name.c_str());
-                //fflush(0);
-
                 // A forward was declared for this proc.
                 // Or we redefined the proc.
                 if (!stored_proc->get_is_forward())
@@ -926,9 +857,6 @@ prochelper:
                     exit(0);
                 }
 
-                //printf("ABOUT TO COMPARE STORED PROC TO DEFINED %s\n", proc_name.c_str());
-                //fflush(0);
-
                 // Compare to forward ProcRec.
                 if (!proc_rec->equal(stored_proc))
                 {
@@ -940,9 +868,6 @@ prochelper:
                     yyerror(errorMsg.c_str());
                     exit(0);
                 }
-                //printf("FINISHED COMPARE STORED PROC TO DEFINED %s\n", proc_name.c_str());
-                //fflush(0);
-
 
                 // Then replace param list with <declist> so names match.
                 // Clean up the old stored list if it exists.
@@ -1072,7 +997,7 @@ stm:
             exit(0);
         }
 
-        // TODO: Should not be able to do this inside fa.
+        // Should not be able to do this inside fa.
         if ($<var_rec>1->get_loop_counter_flag())
         {
             string errorMsg;
@@ -1240,17 +1165,11 @@ fa:
 faentry:
        /* empty rule */
        {
-            //printf("IN FA ENTRY\n");
-            //fflush(0);
-
             sm->enter_scope();
             ++fa_count;
             VarRec *id_rec = new VarRec($<str>0, sm->lookup_type("int"));
             id_rec->set_loop_counter_flag(true);
             sm->insert_var(id_rec);
-            //printf("LEAVING FA ENTRY\n");
-            //fflush(0);
-
        }
        ;
 
@@ -1300,6 +1219,7 @@ lvalue:
             TypeRec *derefType = tempVar->get_type();
             TypeRec *typeLocator = $<type_rec>2;
 
+            // TODO: CLEANUP DEBUG STATEMENTS AFTER TESTING.
             //int temp = 1;
             // typeLocator will be null at primitive level.
             do
@@ -1326,42 +1246,15 @@ lvalue:
                 // Mem loc has to be determined here for P3.
             } while (typeLocator);
 
-            //TypeRec *newVarType = new TypeRec(derefType);
             VarRec *newVarRec = new VarRec("anon_lvalue", derefType);
 
             $$ = newVarRec;
-
-//            // We have an array dereference.
-//            // Push the primitive into the type constructed from
-//            // the dereferece tokens.
-//            TypeRec *varPrimitive = varType->get_primitive();
-//            $<type_rec>2 ->set_primitive(varPrimitive);
-//
-//            // DEBUG
-//            //printf("ABOUT TO CHECK ARRAY TYPE IN LVALUE. (Line: %d)\n", yynewlines);
-//
-//            // Check if the types are the same ignoring size.
-//            if (!$<type_rec>2 ->equal_no_size(varType))
-//            {
-//                // Dereferencing [] does not match variable.
-//                string errorMsg;
-//                errorMsg = "Variable '";
-//                errorMsg += $<str>1;
-//                errorMsg += "' array dereference does not match number of array dimensions.";
-//                yyerror(errorMsg.c_str());
-//                exit(0);
-//            }
-//
-//            // The type is the underlying primitive that was
-//            // dereferenced.
-//            $$ = varPrimitive;
         }
         else
         {
             // This was not an array dereference just a basic
-            // type so just return it.
+            // type so just return the variable record.
             $$ = tempVar;
-            //$$ = varType;
         }
         }
       ;
@@ -1397,9 +1290,6 @@ exp:
    }
    | TK_INT     
         { 
-            //printf("%s >>>> %ld\n", $<str>1, MAX_INT_I9_SIZE);
-            //printf("%s\n", $<str>1);
-
             // Ints have a max size. Check it. Use long so not to
             // overflow the C int.
             if (atol($<str>1) > MAX_INT_I9_SIZE)
@@ -1518,9 +1408,6 @@ exp:
         }
    | TK_ID TK_LPAREN expx TK_RPAREN
         {
-            //printf("IN PROC CALL!!!!\n");
-            //fflush(0);
-
             // Parametered proc call.
             ProcRec *proc_target = sm->lookup_proc($<str>1);
 
@@ -1701,8 +1588,6 @@ exp:
         }
         }
    | exp TK_STAR exp    {
-            // DEBUG
-            //printf("STAR <ptr1: %p> <ptr2: %p>", static_cast<void *>($<type_rec>1), static_cast<void *>($<type_rec>3));
         if (are_int_or_boolean($<type_rec>1, $<type_rec>3)) {
             $$ = $<type_rec>1;
         }

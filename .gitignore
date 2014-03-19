@@ -3,6 +3,13 @@
 *.lo
 *.o
 
+# Bison generated files
+ice9.output
+ice9.tab.h
+ice9.tab.c
+ice9.yy.c
+ice9
+
 # Compiled Dynamic libraries
 *.so
 *.dylib
@@ -11,3 +18,7 @@
 *.lai
 *.la
 *.a
+
+# vim temporary files and swap file.s
+*.*~
+*.swp

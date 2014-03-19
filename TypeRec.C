@@ -165,25 +165,6 @@ TypeRec* TypeRec::get_primitive()
 // dimensions.
 bool TypeRec::equal(TypeRec *rhs)
 {
-    // DEBUG
-    // DEBUG
-    // DEBUG
-    // DEBUG
-    //string temp;
-
-    //if (rhs)
-    //{
-    //    temp = to_string() + rhs->to_string();
-    //    cout << temp << endl;
-    //    fflush(0);
-    //}
-    //else
-    //{
-    //    temp = to_string();
-    //    cout << temp << endl;
-    //    fflush(0);
-    //}
-
     if ((_base_type == rhs->get_base_type())
             && (_ignore_size || (_size == rhs->get_size()))
        )
@@ -198,11 +179,6 @@ bool TypeRec::equal(TypeRec *rhs)
         else if ((_sub_type != 0)
                 && (rhs->get_sub_type() != 0))
         {
-            // DEBUG
-            // DEBUG
-            // DEBUG
-            //cout << "ABOUT TO RECURSE" << endl;
-
             return _sub_type->equal(rhs->get_sub_type());
         }
     }
@@ -229,7 +205,7 @@ bool TypeRec::is_array()
 }
 
 
-// Debug
+// Debug function
 string TypeRec::to_string()
 {
     string temp;
