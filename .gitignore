@@ -19,6 +19,9 @@ ice9
 *.la
 *.a
 
+# CTags tag file.
+tags
+
 # vim temporary files and swap file.s
 *.*~
 *.swp
