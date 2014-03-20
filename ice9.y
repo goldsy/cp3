@@ -23,7 +23,7 @@ int yylex(void); /* function prototype */
 void yyerror(const char *s)
 {
   if ( *yytext == '\0' )
-    fprintf(stderr, "line %d: %s near end of file\n", 
+    fprintf(stderr, "line %d: %s near end of file\n",
 	    yynewlines,s);
   else
     fprintf(stderr, "line %d: %s near %s\n",
@@ -143,7 +143,7 @@ list<VarRec *> *proc_var_rec_list = 0;
 %%
 
 /* START */
-program: 
+program:
        defs stms0 { /* printf("%s\n", sm->knock_knock().c_str()); */ }
     ;
 
@@ -172,9 +172,9 @@ varlist:
        {
             // First determine the type we are dealing with.
             TypeRec *target_type = 0;
-            
+
             // ---------------------
-            // DEBUG 
+            // DEBUG
             // ---------------------
             if (debugFlag)
             {
@@ -203,7 +203,7 @@ varlist:
             for (iter = $<string_list>1->begin(); iter != $<string_list>1->end(); ++iter)
             {
                 // Make sure that the ID isn't already in the current scope var list. (i.e. check the return on the insert.)
-                VarRec *temp = new VarRec(*iter, target_type);   
+                VarRec *temp = new VarRec(*iter, target_type);
 
                 if (!sm->insert_var(temp))
                 {
@@ -211,7 +211,7 @@ varlist:
                     // already exists in the current symbol table.
                     string errorMsg;
                     errorMsg = "Duplicate variable '";
-                    errorMsg += *iter; 
+                    errorMsg += *iter;
                     errorMsg += "' in this scope";
                     yyerror(errorMsg.c_str());
                     exit(0);
@@ -232,56 +232,21 @@ varlist2:
 
 idlist:
       TK_ID idlist2 {
-        // The ID list should not yet exist.
-        // Create it and add this ID to it.
-        // List will be destroyed when id list use is complete.
-        //if (!id_list)
-        //{
-        //    id_list = new list<string>();
-        //}
-
-        //id_list->push_back($<str>1);
-        //$$ = id_list;
-        
-        // Try #2
-        // Always push back on list on top of stack.
-        //id_list_stack->front()->push_back($<str>2);
-        //$$ = id_list_stack;
-
+        // Add this ID to the list pasted back through idlist2.
         $<string_list>2->push_back($<str>1);
         $$ = $<string_list>2;
       }
       ;
 
 idlist2:
-       /* empty rule */ 
+       /* empty rule */
        {
             // First to be called.
-            //id_list = new list<string>();
-            //$$ = id_list;
-
-            // Try #2
-            //id_list_stack->push_front(new list<string>());
-            //$$ = id_list_stack;
-
             $$ = new list<string>();
        }
-       | TK_COMMA TK_ID idlist2 
+       | TK_COMMA TK_ID idlist2
        {
             // Add this ID to the list and return the list ptr.
-            //if (!id_list)
-            //{
-            //    id_list = new list<string>();
-            //}
-
-            //id_list->push_back($<str>2);
-            //$$ = id_list;
-            
-            // Try #2
-            // Always push back on list on top of stack.
-            //id_list_stack->front()->push_back($<str>2);
-            //$$ = id_list_stack;
-
             $<string_list>3->push_back($<str>2);
             $$ = $<string_list>3;
        }
@@ -301,7 +266,7 @@ typeid:
             {
                 string errorMsg;
                 errorMsg = "Undefined type '";
-                errorMsg += $<str>1; 
+                errorMsg += $<str>1;
                 errorMsg += "'";
                 yyerror(errorMsg.c_str());
                 exit(0);
@@ -352,7 +317,7 @@ type:
         else
         {
             // No array. Make a copy so that we can change the name
-            // of the type in the rec. Otherwise we'll change the 
+            // of the type in the rec. Otherwise we'll change the
             // name on the typeid. Not it's key in the map but only
             // in the object which we don't use, but I'm afraid I'll
             // forget if I deviate and try to use it later.
@@ -365,7 +330,7 @@ type:
         {
             string errorMsg;
             errorMsg = "Type '";
-            errorMsg += $<str>2; 
+            errorMsg += $<str>2;
             errorMsg += "' was already declared in this scope.";
             yyerror(errorMsg.c_str());
             exit(0);
@@ -385,33 +350,11 @@ forward:
             {
                 string errorMsg;
                 errorMsg = "Duplicate forward declaration for '";
-                errorMsg += $<str>2; 
+                errorMsg += $<str>2;
                 errorMsg += "'";
                 yyerror(errorMsg.c_str());
                 exit(0);
             }
-            
-       //     // Create the Proc Type.
-       //     string temp_name = $<str>2;
-       //     temp_name += "<proc>";
-       //     TypeRec *procType = new TypeRec(temp_name, procI9);
-
-       //     // Set the return type.
-       //     procType->set_return_type($<type_rec>6);
-
-       //     // Set the param list.
-       //     procType->set_param_list($<var_rec_list>4);
-
-       //     // Check that TK_ID isn't already in the type symbol table.
-       //     if (sm->insert_type(procType))
-       //     {
-       //         string errorMsg;
-       //         errorMsg = "Duplicate forward declaration for '";
-       //         errorMsg += $<str>2; 
-       //         errorMsg += "'";
-       //         yyerror(errorMsg.c_str());
-       //         exit(0);
-       //     }
        }
        ;
 
@@ -429,9 +372,9 @@ forward2:
         ;
 
 declist:
-       /* empty rule */ 
-       { 
-            $$ = 0; 
+       /* empty rule */
+       {
+            $$ = 0;
        }
        | declistx
        {
@@ -479,7 +422,7 @@ declistx:
 
             for (id_iter = $<string_list>1->begin(); id_iter != $<string_list>1->end(); ++id_iter)
             {
-                VarRec *temp = new VarRec(*id_iter, $<type_rec>3);   
+                VarRec *temp = new VarRec(*id_iter, $<type_rec>3);
                 param_list->push_back(temp);
             }
 
@@ -513,277 +456,6 @@ declistx2:
 proc:
     TK_PROC TK_ID procentry TK_LPAREN declist TK_RPAREN proc2 prochelper procdefs stms0 TK_END
     {
-//        ProcRec *stored_proc = sm->lookup_proc($<str>2);
-//        ProcRec *proc_rec = new ProcRec($<str>2, $<type_rec>6, $<var_rec_list>4);
-//
-//        if (stored_proc)
-//        {
-//            // A forward was declared for this proc.
-//            // Or we redefined the proc.
-//            if (!stored_proc->get_is_forward())
-//            {
-//                // What is stored isn't a forward declaration
-//                // so it has been redefined. ERROR!
-//                // Redefinition of procedure name.
-//                string errorMsg;
-//                errorMsg = "Redefinition of procedure '";
-//                errorMsg += $<str>2; 
-//                errorMsg += "'";
-//                yyerror(errorMsg.c_str());
-//                exit(0);
-//            }
-//
-//            // Compare to forward ProcRec.
-//            if (!proc_rec->equal(stored_proc))
-//            {
-//                // Definition conflicts with forward declaration.
-//                string errorMsg;
-//                errorMsg = "Definition of '";
-//                errorMsg += $<str>2; 
-//                errorMsg += "' conflicts with forward declaration";
-//                yyerror(errorMsg.c_str());
-//                exit(0);
-//            }
-//
-//            // Then replace param list with <declist> so names match.
-//            // Clean up the old stored list if it exists.
-//            list<VarRec *> *stored_params = stored_proc->get_param_list();
-//            if (stored_params)
-//            {
-//                list<VarRec *>::iterator stored_iter;
-//                
-//                for(stored_iter = stored_params->begin(); stored_iter != stored_params->end(); ++stored_iter)
-//                {
-//                    delete (*stored_iter);
-//                }
-//
-//                delete stored_params;
-//            }
-//
-//            stored_proc->set_param_list(proc_rec->get_param_list());
-//
-//            // The proc has now been defined.
-//            stored_proc->set_is_forward(false);
-//        }
-//        else
-//        {
-//            if (!sm->insert_proc(proc_rec))
-//            {
-//                string errorMsg;
-//                errorMsg = "Duplicate proc definition for '";
-//                errorMsg += $<str>2; 
-//                errorMsg += "'";
-//                yyerror(errorMsg.c_str());
-//                exit(0);
-//            }
-//        }
-
-
-
-
-
-
-  //      // Lookup TK_ID in *Proc* Symbol Table. Cannot already exist.
-  //      if (sm->lookup_proc($<str>2))
-  //      {
-  //          // Redefinition of procedure name.
-  //          string errorMsg;
-  //          errorMsg = "Redefinition of procedure '";
-  //          errorMsg += $<str>2; 
-  //          errorMsg += "'";
-  //          yyerror(errorMsg.c_str());
-  //          exit(0);
-  //      }
-
-  //      // Lookup TK_ID in *Type* Symbol Table.
-  //      string temp_name = $<str>2;
-  //      temp_name += "<proc>";
-  //      TypeRec *target_type = sm->lookup_type(temp_name);
-
-  //      if (target_type)
-  //      {
-  //          // Make sure that the type is a proc.
-  //          // REMOVED THIS BECAUSE PROC NAMES SHOULD NOT INTERFERE WITH USER TYPE NAMES. ADDED THE <proc> to proc types.
-  //          //if (target_type->get_base_type() != procI9)
-  //          //{
-  //          //    // Illegal reuse of name.
-  //          //    string errorMsg;
-  //          //    errorMsg = "Illegal redeclaration of '";
-  //          //    errorMsg += $<str>2; 
-  //          //    errorMsg += "'";
-  //          //    yyerror(errorMsg.c_str());
-  //          //    exit(0);
-  //          //}
-
-  //          // Make sure that the param types and return type match.
-  //          TypeRec *return_type = target_type->get_return_type();
-
-  //          // Check if one is a proc and the other a function.
-  //          if (((return_type == 0) && ($<type_rec>6 != 0))
-  //              || ((return_type != 0) && ($<type_rec>6 == 0)))
-  //          {
-  //              // Definition conflicts with forward declaration.
-  //              string errorMsg;
-  //              errorMsg = "Definition return value of '";
-  //              errorMsg += $<str>2; 
-  //              errorMsg += "' conflicts with forward declaration";
-  //              yyerror(errorMsg.c_str());
-  //              exit(0);
-  //          }
-
-  //          // If both return a value make sure they are the same.
-  //          if (return_type && $<type_rec>6)
-  //          {
-  //              if (!return_type->equal($<type_rec>6))
-  //              {
-  //                  // Definition conflicts with forward declaration.
-  //                  string errorMsg;
-  //                  errorMsg = "Definition return value of '";
-  //                  errorMsg += $<str>2; 
-  //                  errorMsg += "' conflicts with forward declaration";
-  //                  yyerror(errorMsg.c_str());
-  //                  exit(0);
-  //              }
-  //          }
-
-  //          // TODO Check the parameter list.
-  //          list<VarRec *> *call_params = $<var_rec_list>4;
-  //          list<VarRec *> *stored_params = target_type->get_param_list();
-
-  //          // Check for no vs some parameters.
-  //          if (((stored_params == 0) && (call_params != 0))
-  //              || ((stored_params != 0) && (call_params == 0)))
-  //          {
-  //              // Definition conflicts with forward declaration.
-  //              string errorMsg;
-  //              errorMsg = "Definition parameter list of '";
-  //              errorMsg += $<str>2; 
-  //              errorMsg += "' conflicts with forward declaration";
-  //              yyerror(errorMsg.c_str());
-  //              exit(0);
-  //          }
-
-  //          // They are either both null or not.
-  //          if (stored_params)
-  //          {
-  //              if (stored_params->size() != call_params->size())
-  //              {
-  //                  // Conflict in number
-  //                  string errorMsg;
-  //                  errorMsg = "Definition parameter list of '";
-  //                  errorMsg += $<str>2; 
-  //                  errorMsg += "' conflicts in quatity with forward declaration";
-  //                  yyerror(errorMsg.c_str());
-  //                  exit(0);
-  //              }
-
-  //              list<VarRec *>::iterator call_iter;
-  //              list<VarRec *>::iterator stored_iter = stored_params.begin();
-
-  //              for(call_iter = call_params->begin(); call_iter != call_params->end(); ++call_iter)
-  //              {
-  //                  if (!(*call_iter)->get_type()->equal((*stored_iter)->get_type())) 
-  //                  {
-  //                      // Conflict in parameter type.
-  //                      string errorMsg;
-  //                      errorMsg = "Definition parameter list of '";
-  //                      errorMsg += $<str>2; 
-  //                      errorMsg += "' conflicts in quatity with forward declaration";
-  //                      yyerror(errorMsg.c_str());
-  //                      exit(0);
-  //                  }
-
-  //                  // Already know list sizes are same so for will
-  //                  // protect stored_iter from overrunning end.
-  //                  ++stored_iter;
-  //              }
-  //          }
-
-  //          // Then replace param list with <declist> so names match.
-  //          // Clean up the old stored list if it exists.
-  //          if (stored_params)
-  //          {
-  //              list<VarRec *>::iterator stored_iter;
-  //              
-  //              for(stored_iter = stored_params->begin(); stored_iter != stored_params->end(); ++stored_iter)
-  //              {
-  //                  delete (*stored_iter);
-  //              }
-
-  //              delete stored_params;
-  //          }
-
-  //          target_type->set_param_list(call_params);
-  //      }
-  //      else
-  //      {
-  //          // otherwise create Type for proc.
-  //          string temp_name = $<str>2;
-  //          temp_name += "<proc>";
-  //          target_type = new TypeRec(temp_name, procI9);
-
-  //          // Set the return type.
-  //          target_type->set_return_type($<type_rec>6);
-
-  //          // Set the param list.
-  //          target_type->set_param_list($<var_rec_list>4);
-
-  //          // Check that TK_ID isn't already in the type symbol table.
-  //          if (sm->insert_type(target_type))
-  //          {
-  //              string errorMsg;
-  //              errorMsg = "Duplicate proc declaration for '";
-  //              errorMsg += $<str>2; 
-  //              errorMsg += "'";
-  //              yyerror(errorMsg.c_str());
-  //              exit(0);
-  //          }
-  //      }
-
-
-
-        // If this is a function define a VarRec in the name of the
-        // function with type of return value.
-//        if (stored_proc->get_return_type())
-//        {
-//            VarRec *rtn_var = new VarRec(stored_proc->get_name(), stored_proc->get_return_type());
-//
-//            if ( !sm->insert_var(rtn_var) )
-//            {
-//                string errorMsg;
-//                errorMsg = "Duplicate variable name '";
-//                errorMsg += stored_proc->get_name();
-//                errorMsg += "' for function return type";
-//                yyerror(errorMsg.c_str());
-//                exit(0);
-//            }
-//        }
-
-        // Insert the proc parameters into the Var table.
-        // This will catch duplicate names in the definition too.
-//        list<VarRec*> *scope_vars = $<var_rec_list>4;
-//
-//        if (scope_vars)
-//        {
-//            // Loop through each variable and add them to the var
-//            // symbol table.
-//            list<VarRec*>::iterator iter;
-//
-//            for (iter = scope_vars->begin(); iter != scope_vars->end(); ++iter)
-//            {
-//                // Attempt to insert each variable check for failure.
-//                if( !sm->insert_var(*iter) )
-//                {
-//                    string errorMsg;
-//                    errorMsg = "Duplicate parameter name '";
-//                    errorMsg += (*iter)->get_name();
-//                    errorMsg += "'";
-//                    yyerror(errorMsg.c_str());
-//                    exit(0);
-//                }
-//            }
-//        }
-
         // Set the in_proc_defn_flag = false;
         in_proc_defn_flag = false;
 
@@ -851,7 +523,7 @@ prochelper:
                     // Redefinition of procedure name.
                     string errorMsg;
                     errorMsg = "Redefinition of procedure '";
-                    errorMsg += proc_name; 
+                    errorMsg += proc_name;
                     errorMsg += "'";
                     yyerror(errorMsg.c_str());
                     exit(0);
@@ -863,7 +535,7 @@ prochelper:
                     // Definition conflicts with forward declaration.
                     string errorMsg;
                     errorMsg = "Definition of '";
-                    errorMsg += proc_name; 
+                    errorMsg += proc_name;
                     errorMsg += "' conflicts with forward declaration";
                     yyerror(errorMsg.c_str());
                     exit(0);
@@ -875,7 +547,7 @@ prochelper:
                 if (stored_params)
                 {
                     list<VarRec *>::iterator stored_iter;
-                    
+
                     for(stored_iter = stored_params->begin(); stored_iter != stored_params->end(); ++stored_iter)
                     {
                         delete (*stored_iter);
@@ -895,7 +567,7 @@ prochelper:
                 {
                     string errorMsg;
                     errorMsg = "Duplicate proc definition for '";
-                    errorMsg += proc_name; 
+                    errorMsg += proc_name;
                     errorMsg += "'";
                     yyerror(errorMsg.c_str());
                     exit(0);
@@ -1113,35 +785,6 @@ doentry:
 fa:
   TK_FA TK_ID faentry TK_ASSIGN exp TK_TO exp TK_ARROW stms0 TK_AF
   {
-//        // TK_ID must be a declared variable.
-//        VarRec *id_rec = sm->lookup_var($<str>2);
-//
-//        if (!id_rec)
-//        {
-//            // Variable undefined.
-//            string errorMsg;
-//            errorMsg = "Undefined loop variable '";
-//            errorMsg += $<str>2; 
-//            errorMsg += "'";
-//            yyerror(errorMsg.c_str());
-//            exit(0);
-//        }
-//
-//        // TK_ID must be an int and is therefore assignable. 
-//        TypeRec *id_type = id_rec->get_type();
-//        TypeRec *int_rec = sm->lookup_type("int");
-//
-//        if (!int_rec->equal(id_type))
-//        {
-//            // Loop variable type invalid.
-//            string errorMsg;
-//            errorMsg = "Invalid loop variable type '";
-//            errorMsg += $<str>2; 
-//            errorMsg += "'";
-//            yyerror(errorMsg.c_str());
-//            exit(0);
-//        }
-
         TypeRec *int_rec = sm->lookup_type("int");
 
         // Both expressions must be an int.
@@ -1183,7 +826,7 @@ lvalue:
         {
             string errorMsg;
             errorMsg = "Undefined variable '";
-            errorMsg += $<str>1; 
+            errorMsg += $<str>1;
             errorMsg += "'";
             yyerror(errorMsg.c_str());
             exit(0);
@@ -1196,6 +839,7 @@ lvalue:
         {
             printf("ID [%s]\n", $1);
         }
+
         // If lvalue2 is not null check that TK_ID's array
         // dimensions are same. NOT bounds but number of recursive
         // arrays in the type. Assigning array contents in mass is
@@ -1284,12 +928,12 @@ lvalue2:
       ;
 
 exp:
-   lvalue       
-   { 
-        $$ = $<var_rec>1->get_type(); 
+   lvalue
+   {
+        $$ = $<var_rec>1->get_type();
    }
-   | TK_INT     
-        { 
+   | TK_INT
+        {
             // Ints have a max size. Check it. Use long so not to
             // overflow the C int.
             if (atol($<str>1) > MAX_INT_I9_SIZE)
@@ -1302,7 +946,7 @@ exp:
 
             // DEBUG
             //printf("RETURNING INT FROM %s (prt: %p)", $<str>1, static_cast<void *>(sm->lookup_type("int")));
-            $$ = sm->lookup_type("int"); 
+            $$ = sm->lookup_type("int");
         }
    | TK_TRUE    { $$ = sm->lookup_type("bool"); }
    | TK_FALSE   { $$ = sm->lookup_type("bool"); }
@@ -1317,7 +961,7 @@ exp:
             yyerror("Incompatible type for unary minus");
             exit(0);
         }
-        } 
+        }
    | TK_QUEST exp  {
         if (is_boolean($<type_rec>2)) {
             // Question returns an int type.
@@ -1329,7 +973,7 @@ exp:
             exit(0);
         }
         }
-   | TK_ID TK_LPAREN TK_RPAREN  
+   | TK_ID TK_LPAREN TK_RPAREN
         {
             // Parameter-less proc call.
             ProcRec *proc_target = sm->lookup_proc($<str>1);
@@ -1341,7 +985,7 @@ exp:
                     // Param list not empty.
                     string errorMsg;
                     errorMsg = "Invalid parameter list for '";
-                    errorMsg += $<str>1; 
+                    errorMsg += $<str>1;
                     yyerror(errorMsg.c_str());
                     exit(0);
                 }
@@ -1357,54 +1001,11 @@ exp:
                 // Proc call not found.
                 string errorMsg;
                 errorMsg = "Proc '";
-                errorMsg += $<str>1; 
+                errorMsg += $<str>1;
                 errorMsg += "' is not declared.";
                 yyerror(errorMsg.c_str());
                 exit(0);
             }
-
-
-// SWITCH TO ProcRec
-//            // Look up name in the type symbol table.
-//            TypeRec *target = sm->lookup_type($<str>1);
-//
-//            if (target)
-//            {
-//                // Check if the base type is proc.
-//                if(target->get_base_type() != procI9)
-//                {
-//                    string errorMsg;
-//                    errorMsg = $<str>1;
-//                    errorMsg += "' is not callable.";
-//                    yyerror(errorMsg.c_str());
-//                    exit(0);
-//                }
-//                else if(target->get_param_list())
-//                {
-//                    // Param list not empty.
-//                    string errorMsg;
-//                    errorMsg = "Invalid parameter list for '";
-//                    errorMsg += $<str>1; 
-//                    yyerror(errorMsg.c_str());
-//                    exit(0);
-//                }
-//                else
-//                {
-//                    // This might be null if proc (vs function) but
-//                    // the next level up will determine if that matters.
-//                    $$ = target->get_return_type();
-//                }
-//            }
-//            else
-//            {
-//                // Proc call not found.
-//                string errorMsg;
-//                errorMsg = "Proc '";
-//                errorMsg += $<str>1; 
-//                errorMsg += "' is not declared.";
-//                yyerror(errorMsg.c_str());
-//                exit(0);
-//            }
         }
    | TK_ID TK_LPAREN expx TK_RPAREN
         {
@@ -1420,7 +1021,7 @@ exp:
                     // Param list not empty.
                     string errorMsg;
                     errorMsg = "Invalid parameter list for ";
-                    errorMsg += $<str>1; 
+                    errorMsg += $<str>1;
                     yyerror(errorMsg.c_str());
                     exit(0);
                 }
@@ -1433,7 +1034,7 @@ exp:
                     // Called number of params doesn't match proc type.
                     string errorMsg;
                     errorMsg = "Invalid number of parameters for ";
-                    errorMsg += $<str>1; 
+                    errorMsg += $<str>1;
                     yyerror(errorMsg.c_str());
                     exit(0);
                 }
@@ -1450,11 +1051,11 @@ exp:
                         // Param types do not match.
                         string errorMsg;
                         errorMsg = "Incompatible parameter type for ";
-                        errorMsg += $<str>1; 
+                        errorMsg += $<str>1;
                         yyerror(errorMsg.c_str());
                         exit(0);
                     }
-                    
+
                     // Already know list sizes are same so for will
                     // protect param_iter from overrunning end.
                     ++param_iter;
@@ -1469,7 +1070,7 @@ exp:
                 // Proc call not found.
                 string errorMsg;
                 errorMsg = "Proc '";
-                errorMsg += $<str>1; 
+                errorMsg += $<str>1;
                 errorMsg += "' is not declared.";
                 yyerror(errorMsg.c_str());
                 exit(0);
@@ -1479,95 +1080,9 @@ exp:
             // the type symbol table so we can just throw the list
             // away without concern for the pointers.
             delete $<type_rec_list>3;
-
-
-
-
-// SWITCH TO ProcRec
-//            // Look up name in the type symbol table.
-//            TypeRec *target = sm->lookup_type($<str>1);
-//
-//            if (target)
-//            {
-//                // Check if the base type is proc.
-//                if(target->get_base_type() != procI9)
-//                {
-//                    string errorMsg;
-//                    errorMsg = "'";
-//                    errorMsg += $<str>1;
-//                    errorMsg += "' is not callable.";
-//                    yyerror(errorMsg.c_str());
-//                    exit(0);
-//                }
-//
-//                list<VarRec *> *param_list = target->get_param_list();
-//
-//                if(!param_list)
-//                {
-//                    // Param list not empty.
-//                    string errorMsg;
-//                    errorMsg = "Invalid parameter list for ";
-//                    errorMsg += $<str>1; 
-//                    yyerror(errorMsg.c_str());
-//                    exit(0);
-//                }
-//
-//                list<TypeRec *> *called_types = $<type_rec_list>3;
-//
-//                // Quick check on number of params.
-//                if (called_types->size() != param_list->size())
-//                {
-//                    // Called number of params doesn't match proc type.
-//                    string errorMsg;
-//                    errorMsg = "Invalid number of parameters for ";
-//                    errorMsg += $<str>1; 
-//                    yyerror(errorMsg.c_str());
-//                    exit(0);
-//                }
-//
-//                list<TypeRec *>::iterator iter;
-//                list<VarRec *>::iterator param_iter = param_list->begin();
-//
-//                // Make sure that the called types match the param
-//                // list types.
-//                for(iter = called_types->begin(); iter != called_types->end(); ++iter)
-//                {
-//                    if (!(*iter)->equal((*param_iter)->get_type()))
-//                    {
-//                        // Param types do not match.
-//                        string errorMsg;
-//                        errorMsg = "Incompatible parameter type for ";
-//                        errorMsg += $<str>1; 
-//                        yyerror(errorMsg.c_str());
-//                        exit(0);
-//                    }
-//                    
-//                    // Already know list sizes are same so for will
-//                    // protect param_iter from overrunning end.
-//                    ++param_iter;
-//                }
-//
-//                // This might be null if proc (vs function) but
-//                // the next level up will determine if that matters.
-//                $$ = target->get_return_type();
-//            }
-//            else
-//            {
-//                // Proc call not found.
-//                string errorMsg;
-//                errorMsg = "Proc '";
-//                errorMsg += $<str>1; 
-//                errorMsg += "' is not declared.";
-//                yyerror(errorMsg.c_str());
-//                exit(0);
-//            }
-//
-//            // The expx list contains pointers already maintined in
-//            // the type symbol table so we can just throw the list
-//            // away without concern for the pointers.
-//            delete $<type_rec_list>3;
         }
-   | exp TK_PLUS exp    {
+   | exp TK_PLUS exp
+    {
         if (are_int_or_boolean($<type_rec>1, $<type_rec>3)) {
             $$ = $<type_rec>1;
         }
@@ -1576,8 +1091,9 @@ exp:
             yyerror("Incompatible types for binary plus operator");
             exit(0);
         }
-        }
-   | exp TK_MINUS exp   { 
+    }
+   | exp TK_MINUS exp
+    {
         if (are_int($<type_rec>1, $<type_rec>3)) {
             $$ = $<type_rec>1;
         }
@@ -1586,8 +1102,9 @@ exp:
             yyerror("Incompatible types for binary minus");
             exit(0);
         }
-        }
-   | exp TK_STAR exp    {
+    }
+   | exp TK_STAR exp
+    {
         if (are_int_or_boolean($<type_rec>1, $<type_rec>3)) {
             $$ = $<type_rec>1;
         }
@@ -1596,8 +1113,9 @@ exp:
             yyerror("Incompatible types for binary multiplication operator");
             exit(0);
         }
-        }
-   | exp TK_SLASH exp {
+    }
+   | exp TK_SLASH exp
+    {
         if (are_int($<type_rec>1, $<type_rec>3)) {
             $$ = $<type_rec>1;
         }
@@ -1606,8 +1124,9 @@ exp:
             yyerror("Incompatible types for division operator");
             exit(0);
         }
-        }
-   | exp TK_MOD exp     {
+    }
+   | exp TK_MOD exp
+    {
         if (are_int($<type_rec>1, $<type_rec>3)) {
             $$ = $<type_rec>1;
         }
@@ -1616,8 +1135,9 @@ exp:
             yyerror("Incompatible types for modulo operator");
             exit(0);
         }
-        }
-   | exp TK_EQ exp      {
+    }
+   | exp TK_EQ exp
+    {
         if (are_int_or_boolean($<type_rec>1, $<type_rec>3)) {
             // Equal comparison always returns boolean type.
             $$ = sm->lookup_type("bool");
@@ -1627,8 +1147,9 @@ exp:
             yyerror("Incompatible types for binary comparison equal");
             exit(0);
         }
-        }
-   | exp TK_NEQ exp     {
+    }
+   | exp TK_NEQ exp
+    {
         if (are_int_or_boolean($<type_rec>1, $<type_rec>3)) {
             // Equal comparison always returns boolean type.
             $$ = sm->lookup_type("bool");
@@ -1638,8 +1159,9 @@ exp:
             yyerror("Incompatible types for binary comparison not equal");
             exit(0);
         }
-        }
-   | exp TK_GT exp      {
+    }
+   | exp TK_GT exp
+    {
         if (are_int($<type_rec>1, $<type_rec>3)) {
             // Greater than comparison always returns boolean type.
             $$ = sm->lookup_type("bool");
@@ -1649,8 +1171,9 @@ exp:
             yyerror("Incompatible types for binary greater than operator");
             exit(0);
         }
-        }
-   | exp TK_LT exp      {
+    }
+   | exp TK_LT exp
+    {
         if (are_int($<type_rec>1, $<type_rec>3)) {
             // Less than comparison always returns boolean type.
             $$ = sm->lookup_type("bool");
@@ -1660,8 +1183,9 @@ exp:
             yyerror("Incompatible types for binary less than operator");
             exit(0);
         }
-        }
-   | exp TK_GE exp      {
+    }
+   | exp TK_GE exp
+    {
         if (are_int($<type_rec>1, $<type_rec>3)) {
             // Greater than equal comparison always returns boolean type.
             $$ = sm->lookup_type("bool");
@@ -1671,8 +1195,9 @@ exp:
             yyerror("Incompatible types for binary greater than or equal operator");
             exit(0);
         }
-        }
-   | exp TK_LE exp      {
+    }
+   | exp TK_LE exp
+    {
         if (are_int($<type_rec>1, $<type_rec>3)) {
             // Less than or equal comparison always returns boolean type.
             $$ = sm->lookup_type("bool");
@@ -1682,7 +1207,7 @@ exp:
             yyerror("Incompatible types for binary less than or equal operator");
             exit(0);
         }
-        }
+    }
    | TK_LPAREN exp TK_RPAREN    { $$ = $<type_rec>2; }
    ;
 
@@ -1693,14 +1218,14 @@ expx:
         list<TypeRec *> *param_types = new list<TypeRec *>();
         param_types->push_back($<type_rec>1);
 
-        $$ = param_types; 
+        $$ = param_types;
     }
     | expx TK_COMMA exp
-    { 
+    {
         list<TypeRec *> *param_types = $<type_rec_list>1;
         param_types->push_back($<type_rec>3);
 
-        $$ = param_types; 
+        $$ = param_types;
     }
     ;
 %%

@@ -6,8 +6,7 @@
 
 #include <string>
 
-//#include "TypeRec.H"
-class TypeRec;
+#include "TypeRec.H"
 
 
 using namespace std;
@@ -31,6 +30,10 @@ class VarRec {
         // Const flag indicating a read-only variable. (Const or literal.)
         bool _const_flag;
 
+        // String representation of the value.
+        string _str_value;
+
+
     public:
         // Default ctor.
         VarRec(string var_name, TypeRec *var_type, bool const_flag = false);
@@ -43,12 +46,14 @@ class VarRec {
         TypeRec* get_type();
         bool get_loop_counter_flag();
         bool is_const();
+        string get_value();
         // TODO: getter for memory location???
 
 
         // Setters
         void set_loop_counter_flag(bool flag);
         void set_const_flag(bool flag);
+        void set_value(string str_value);
 
         // TODO: setter for memory location???
 
