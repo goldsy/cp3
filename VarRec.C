@@ -5,13 +5,18 @@
 
 
 // Class ctor.
-VarRec::VarRec(string var_name, TypeRec *var_type, bool const_flag)
+VarRec::VarRec(
+        string var_name, 
+        TypeRec *var_type, 
+        bool const_flag,
+        string init_value
+        )
 {
     _var_name = var_name;
     _var_type = var_type;
     _loop_counter_flag = false;
     _const_flag = const_flag;
-    _str_value = "";
+    _str_value = init_value;
 }
 
 

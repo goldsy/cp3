@@ -36,7 +36,8 @@ class VarRec {
 
     public:
         // Default ctor.
-        VarRec(string var_name, TypeRec *var_type, bool const_flag = false);
+        VarRec(string var_name, TypeRec *var_type, 
+                bool const_flag = false, string init_value = "");
 
         // Class dtor.
         ~VarRec() { };

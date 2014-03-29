@@ -127,8 +127,8 @@ list<VarRec *> *proc_var_rec_list = 0;
 %left TK_PLUS TK_MINUS
 %nonassoc TK_EQ TK_NEQ TK_GT TK_LT TK_GE TK_LE
 
-%type <type_rec> exp
-%type <type_rec_list> expx
+%type <var_rec> exp
+%type <var_rec_list> expx
 %type <var_rec> lvalue
 %type <type_rec> lvalue2
 %type <string_list> idlist
@@ -930,7 +930,7 @@ lvalue2:
 exp:
    lvalue
    {
-        $$ = $<var_rec>1->get_type();
+        $$ = $<var_rec>1;
    }
    | TK_INT
         {
@@ -946,15 +946,48 @@ exp:
 
             // DEBUG
             //printf("RETURNING INT FROM %s (prt: %p)", $<str>1, static_cast<void *>(sm->lookup_type("int")));
-            $$ = sm->lookup_type("int");
+
+            // Look up the int type.
+            TypeRec *target_type = sm->lookup_type("int");
+            $$ = new VarRec("int_literal", target_type, true, $<str>1);
+            //$$ = sm->lookup_type("int");
         }
-   | TK_TRUE    { $$ = sm->lookup_type("bool"); }
-   | TK_FALSE   { $$ = sm->lookup_type("bool"); }
-   | TK_SLIT    { $$ = sm->lookup_type("string"); }
-   | TK_READ    { $$ = sm->lookup_type("int"); }
+   | TK_TRUE    
+    { 
+        TypeRec *target_type = sm->lookup_type("bool");
+        $$ = new VarRec("bool_literal", target_type, true, "1");
+        //$$ = sm->lookup_type("bool"); 
+    }
+   | TK_FALSE
+    { 
+        TypeRec *target_type = sm->lookup_type("bool");
+        $$ = new VarRec("bool_literal", target_type, true, "0");
+        //$$ = sm->lookup_type("bool"); 
+    }
+   | TK_SLIT    
+    { 
+        TypeRec *target_type = sm->lookup_type("string");
+        $$ = new VarRec("string_literal", target_type, true, $<str>1);
+        //$$ = sm->lookup_type("string"); 
+    }
+   | TK_READ    
+    { 
+        // TODO: THE READ PULLS AN INT THAT THE USER ENTERS.  FIGURE THIS ONE OUT.
+        //      FOR NOW JUST RETURN A KNOWN VALUE THAT CAN BE TESTED.
+        //      ??? RUNTIME CHECK FOR INT ???
+        TypeRec *target_type = sm->lookup_type("int");
+        //      FOR NOW JUST RETURN A KNOWN VALUE THAT CAN BE TESTED.
+        //      FOR NOW JUST RETURN A KNOWN VALUE THAT CAN BE TESTED.
+        //      FOR NOW JUST RETURN A KNOWN VALUE THAT CAN BE TESTED.
+        $$ = new VarRec("int_literal", target_type, true, "0");
+        //$$ = sm->lookup_type("int"); 
+    }
    | TK_MINUS exp  {
-        if (is_int_or_boolean($<type_rec>2)) {
-            $$ = $<type_rec>2;
+        if (is_int_or_boolean($<var_rec>2->get_type())) {
+            // TODO: PERFORM UNARY MINUS OP ON EXP.
+            // TODO: PERFORM UNARY MINUS OP ON EXP.
+            // TODO: PERFORM UNARY MINUS OP ON EXP.
+            $$ = $<var_rec>2;
         }
         else {
             // TYPE ERROR!
@@ -963,9 +996,19 @@ exp:
         }
         }
    | TK_QUEST exp  {
-        if (is_boolean($<type_rec>2)) {
+        if (is_boolean($<var_rec>2->get_type())) {
             // Question returns an int type.
-            $$ = sm->lookup_type("int");
+            TypeRec *target_type = sm->lookup_type("int");
+
+            // TODO: GIVE THIS SOME THOUGHT.
+            // Since true is 1 and false is 0 to convert to an int just
+            // copy the variable but changine the type.
+            // TODO: CHECK OUT RETURN BY REFERENCE FOR RETURN VALUES IN FUNCTIONS.
+            //      THE CONSTANT FLAG MIGHT NOT FLY AND CREATING A NEW VARIABLE MIGHT
+            //      NOT EITHER.
+            $$ = new VarRec("quest_rtn_val", target_type, true,
+                $<var_rec>2->get_value());
+            //$$ = sm->lookup_type("int");
         }
         else {
             // TYPE ERROR!
@@ -993,7 +1036,24 @@ exp:
                 {
                     // This might be null if proc (vs function) but
                     // the next level up will determine if that matters.
-                    $$ = proc_target->get_return_type();
+                    if (proc_target->get_return_type())
+                    {
+                        // The activation record will be created with this
+                        // memory location to return the value in.
+                        $$ = new VarRec("alias_rtn_val",
+                            proc_target->get_return_type());
+
+                        // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED.
+                        // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED.
+                        // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED.
+                    }
+                    else
+                    {
+                        // There is no return value.
+                        $$ = 0;
+                    }
+
+                    //$$ = proc_target->get_return_type();
                 }
             }
             else
@@ -1026,10 +1086,10 @@ exp:
                     exit(0);
                 }
 
-                list<TypeRec *> *called_types = $<type_rec_list>3;
+                list<VarRec *> *called_params = $<var_rec_list>3;
 
                 // Quick check on number of params.
-                if (called_types->size() != param_list->size())
+                if (called_params->size() != param_list->size())
                 {
                     // Called number of params doesn't match proc type.
                     string errorMsg;
@@ -1039,14 +1099,14 @@ exp:
                     exit(0);
                 }
 
-                list<TypeRec *>::iterator iter;
+                list<VarRec *>::iterator iter;
                 list<VarRec *>::iterator param_iter = param_list->begin();
 
                 // Make sure that the called types match the param
                 // list types.
-                for(iter = called_types->begin(); iter != called_types->end(); ++iter)
+                for(iter = called_params->begin(); iter != called_params->end(); ++iter)
                 {
-                    if (!(*iter)->equal((*param_iter)->get_type()))
+                    if (!(*iter)->get_type()->equal((*param_iter)->get_type()))
                     {
                         // Param types do not match.
                         string errorMsg;
@@ -1063,7 +1123,23 @@ exp:
 
                 // This might be null if proc (vs function) but
                 // the next level up will determine if that matters.
-                $$ = proc_target->get_return_type();
+                if (proc_target->get_return_type())
+                {
+                    // The activation record will be created with this
+                    // memory location to return the value in.
+                    $$ = new VarRec("alias_rtn_val", proc_target->get_return_type());
+
+                    // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED.
+                    // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED.
+                    // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED.
+                }
+                else
+                {
+                    // There is no return value.
+                    $$ = 0;
+                }
+
+                //$$ = proc_target->get_return_type();
             }
             else
             {
@@ -1079,14 +1155,32 @@ exp:
             // The expx list contains pointers already maintined in
             // the type symbol table so we can just throw the list
             // away without concern for the pointers.
-            delete $<type_rec_list>3;
+            delete $<var_rec_list>3;
         }
    | exp TK_PLUS exp
     {
-        if (are_int_or_boolean($<type_rec>1, $<type_rec>3)) {
-            $$ = $<type_rec>1;
+        if (are_int_or_boolean($<var_rec>1->get_type(), $<var_rec>3->get_type())) 
+        {
+            VarRec *rtn_var = new VarRec("addition_return", $<var_rec>1->get_type());
+
+            // TODO: PERFORM PLUS OP ON THE TWO EXP
+            // POSSIBLY RETURN THE VARIABLE FOR THE ACCUMULATOR?????
+            if (is_int($<var_rec>1->get_type()))
+            {
+                // Do integer addition.
+                // TODO: EMIT INTEGER ADDITION CODE HERE.
+            }
+            else
+            {
+                // Do boolean addition op.
+                // TODO: EMIT BOOLEAN ADDITION CODE HERE.
+            }
+
+            $$ = rtn_var;
+            //$$ = $<var_rec>1;
         }
-        else {
+        else 
+        {
             // TYPE ERROR!
             yyerror("Incompatible types for binary plus operator");
             exit(0);
@@ -1094,10 +1188,16 @@ exp:
     }
    | exp TK_MINUS exp
     {
-        if (are_int($<type_rec>1, $<type_rec>3)) {
-            $$ = $<type_rec>1;
+        if (are_int($<var_rec>1->get_type(), $<var_rec>3->get_type())) 
+        {
+            VarRec *rtn_var = new VarRec("subtr_return", $<var_rec>1->get_type());
+
+            // Do integer subtraction.
+            // TODO: EMIT INTEGER SUBTRACTION CODE HERE.
+            $$ = rtn_var;
         }
-        else {
+        else 
+        {
             // TYPE ERROR!
             yyerror("Incompatible types for binary minus");
             exit(0);
@@ -1106,7 +1206,23 @@ exp:
    | exp TK_STAR exp
     {
         if (are_int_or_boolean($<type_rec>1, $<type_rec>3)) {
-            $$ = $<type_rec>1;
+            VarRec *rtn_var = new VarRec("starop_return", $<var_rec>1->get_type());
+
+            // TODO: PERFORM STAR OP ON THE TWO EXP
+            // POSSIBLY RETURN THE VARIABLE FOR THE ACCUMULATOR?????
+            if (is_int($<var_rec>1->get_type()))
+            {
+                // Do integer multiplication.
+                // TODO: EMIT INTEGER MULTIPLICATION CODE HERE.
+            }
+            else
+            {
+                // Do boolean multiplication op.
+                // TODO: EMIT BOOLEAN MULTIPLICATION CODE HERE.
+            }
+
+            $$ = rtn_var;
+            //$$ = $<type_rec>1;
         }
         else {
             // TYPE ERROR!
@@ -1117,7 +1233,12 @@ exp:
    | exp TK_SLASH exp
     {
         if (are_int($<type_rec>1, $<type_rec>3)) {
-            $$ = $<type_rec>1;
+            VarRec *rtn_var = new VarRec("division_return", $<var_rec>1->get_type());
+
+            // Do integer division.
+            // TODO: EMIT INTEGER DIVISION CODE HERE.
+            $$ = rtn_var;
+            //$$ = $<type_rec>1;
         }
         else {
             // TYPE ERROR!
@@ -1128,7 +1249,14 @@ exp:
    | exp TK_MOD exp
     {
         if (are_int($<type_rec>1, $<type_rec>3)) {
-            $$ = $<type_rec>1;
+            VarRec *rtn_var = new VarRec("mod_return", $<var_rec>1->get_type());
+
+            // Do integer modulus.
+            // TODO: EMIT INTEGER MODULUS CODE HERE.
+            // TODO: EMIT INTEGER MODULUS CODE HERE.
+            // TODO: EMIT INTEGER MODULUS CODE HERE.
+            $$ = rtn_var;
+            //$$ = $<type_rec>1;
         }
         else {
             // TYPE ERROR!
@@ -1140,7 +1268,13 @@ exp:
     {
         if (are_int_or_boolean($<type_rec>1, $<type_rec>3)) {
             // Equal comparison always returns boolean type.
-            $$ = sm->lookup_type("bool");
+            VarRec *rtn_var = new VarRec("EQ_return", sm->lookup_type("bool"));
+
+            // TODO: PERFORM COMPARISON OP ON EXPs.
+            // TODO: PERFORM COMPARISON OP ON EXPs.
+            // TODO: PERFORM COMPARISON OP ON EXPs.
+            $$ = rtn_var;
+            //$$ = sm->lookup_type("bool");
         }
         else {
             // TYPE ERROR!
@@ -1151,8 +1285,14 @@ exp:
    | exp TK_NEQ exp
     {
         if (are_int_or_boolean($<type_rec>1, $<type_rec>3)) {
-            // Equal comparison always returns boolean type.
-            $$ = sm->lookup_type("bool");
+            // Not equal comparison always returns boolean type.
+            VarRec *rtn_var = new VarRec("NEQ_return", sm->lookup_type("bool"));
+
+            // TODO: PERFORM NOT EQUAL OP ON EXPs.
+            // TODO: PERFORM NOT EQUAL OP ON EXPs.
+            // TODO: PERFORM NOT EQUAL OP ON EXPs.
+            $$ = rtn_var;
+            //$$ = sm->lookup_type("bool");
         }
         else {
             // TYPE ERROR!
@@ -1164,7 +1304,13 @@ exp:
     {
         if (are_int($<type_rec>1, $<type_rec>3)) {
             // Greater than comparison always returns boolean type.
-            $$ = sm->lookup_type("bool");
+            VarRec *rtn_var = new VarRec("GT_return", sm->lookup_type("bool"));
+
+            // TODO: PERFORM GREATER THAN OP ON EXPs.
+            // TODO: PERFORM GREATER THAN OP ON EXPs.
+            // TODO: PERFORM GREATER THAN OP ON EXPs.
+            $$ = rtn_var;
+            //$$ = sm->lookup_type("bool");
         }
         else {
             // TYPE ERROR!
@@ -1176,7 +1322,13 @@ exp:
     {
         if (are_int($<type_rec>1, $<type_rec>3)) {
             // Less than comparison always returns boolean type.
-            $$ = sm->lookup_type("bool");
+            VarRec *rtn_var = new VarRec("LT_return", sm->lookup_type("bool"));
+
+            // TODO: PERFORM LESS THAN OP ON EXPs.
+            // TODO: PERFORM LESS THAN OP ON EXPs.
+            // TODO: PERFORM LESS THAN OP ON EXPs.
+            $$ = rtn_var;
+            //$$ = sm->lookup_type("bool");
         }
         else {
             // TYPE ERROR!
@@ -1188,7 +1340,13 @@ exp:
     {
         if (are_int($<type_rec>1, $<type_rec>3)) {
             // Greater than equal comparison always returns boolean type.
-            $$ = sm->lookup_type("bool");
+            VarRec *rtn_var = new VarRec("GE_return", sm->lookup_type("bool"));
+
+            // TODO: PERFORM GREATER THAN OR EQUAL OP ON EXPs.
+            // TODO: PERFORM GREATER THAN OR EQUAL OP ON EXPs.
+            // TODO: PERFORM GREATER THAN OR EQUAL OP ON EXPs.
+            $$ = rtn_var;
+            //$$ = sm->lookup_type("bool");
         }
         else {
             // TYPE ERROR!
@@ -1200,7 +1358,13 @@ exp:
     {
         if (are_int($<type_rec>1, $<type_rec>3)) {
             // Less than or equal comparison always returns boolean type.
-            $$ = sm->lookup_type("bool");
+            VarRec *rtn_var = new VarRec("LE_return", sm->lookup_type("bool"));
+
+            // TODO: PERFORM LESS THAN OR EQUAL OP ON EXPs.
+            // TODO: PERFORM LESS THAN OR EQUAL OP ON EXPs.
+            // TODO: PERFORM LESS THAN OR EQUAL OP ON EXPs.
+            $$ = rtn_var;
+            //$$ = sm->lookup_type("bool");
         }
         else {
             // TYPE ERROR!
@@ -1208,24 +1372,27 @@ exp:
             exit(0);
         }
     }
-   | TK_LPAREN exp TK_RPAREN    { $$ = $<type_rec>2; }
+   | TK_LPAREN exp TK_RPAREN    
+    { 
+        $$ = $<var_rec>2; 
+    }
    ;
 
 expx:
     exp
     {
-        // Create a new type list and stuff this type into it.
-        list<TypeRec *> *param_types = new list<TypeRec *>();
-        param_types->push_back($<type_rec>1);
+        // Create a new param variable list and stuff this param into it.
+        list<VarRec *> *params = new list<VarRec *>();
+        params->push_back($<var_rec>1);
 
-        $$ = param_types;
+        $$ = params;
     }
     | expx TK_COMMA exp
     {
-        list<TypeRec *> *param_types = $<type_rec_list>1;
-        param_types->push_back($<type_rec>3);
+        list<VarRec *> *params = $<var_rec_list>1;
+        params->push_back($<var_rec>3);
 
-        $$ = param_types;
+        $$ = params;
     }
     ;
 %%
