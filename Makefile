@@ -92,3 +92,8 @@ lextest:	$(LEXTESTOBJS)
 
 lextest.o:	lextest.c
 	$(CC) $(CFLAGS) -c $<
+
+# -----------------------------------------------------------
+# Makefile rule for Time Machine (TM)
+tm:	tm.c
+	gcc -o tm tm.c
