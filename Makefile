@@ -11,7 +11,7 @@ CFLAGS	= -g -Wall -pedantic
 LIB	= -lfl
 
 # List of source files.
-SRC	= ice9.l ice9.y TypeRec.C VarRec.C ProcRec.C ScopeMgr.C
+SRC	= ice9.l ice9.y TypeRec.C VarRec.C ProcRec.C ScopeMgr.C CodeGenerator.C
 
 # The lexer object file.
 LEXOBJ = ice9.yy.o
@@ -20,7 +20,7 @@ LEXOBJ = ice9.yy.o
 LEXTESTOBJS = lextest.o $(LEXOBJ)
 
 # Object file list.
-OBJ	= $(LEXOBJ) ice9.tab.o TypeRec.o VarRec.o ProcRec.o ScopeMgr.o ActionFunctions.o
+OBJ	= $(LEXOBJ) ice9.tab.o TypeRec.o VarRec.o ProcRec.o ScopeMgr.o ActionFunctions.o CodeGenerator.o
 
 # -----------------------------------------------------------
 # Default Makefile rule. @ rule target. ^ set of dependent files. < first prerequisite.
@@ -59,6 +59,9 @@ ScopeMgr.o: ScopeMgr.C ScopeMgr.H
 ActionFunctions.o: ActionFunctions.C ActionFunctions.H
 	$(CC) $(CFLAGS) -c $<
 
+CodeGenerator.o: CodeGenerator.C CodeGenerator.H
+	$(CC) $(CFLAGS) -c $<
+
 
 # Run flex on the .l file to get the lexer.
 # Also inlcude the paser definitions (creation will be triggered.)
@@ -84,7 +87,7 @@ p1.tar.gz:	Makefile $(SRC)
 # Create zip file to conform to submission instructions
 # to submit a zip file.
 zip:
-	zip program $(SRC) lextest.c Makefile REFERENCES README compile.sh TypeRec.H VarRec.H ProcRec.H ScopeMgr.H ActionFunctions.H ActionFunctions.C
+	zip program $(SRC) lextest.c Makefile REFERENCES README compile.sh TypeRec.H VarRec.H ProcRec.H ScopeMgr.H ActionFunctions.H ActionFunctions.C CodeGenerator.H CodeGenerator.C
 
 # Build rule for the lexer test harness.
 lextest:	$(LEXTESTOBJS)
