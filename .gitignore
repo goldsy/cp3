@@ -26,5 +26,6 @@ tags
 *.*~
 *.swp
 
-# Tiny Machine executable.
+# Tiny Machine executable and tm machine files.
 tm
+*.tm
