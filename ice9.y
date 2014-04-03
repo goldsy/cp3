@@ -9,6 +9,7 @@
 #include "ScopeMgr.H"
 #include "TypeRec.H"
 #include "VarRec.H"
+#include "CodeGenerator.H"
 
 using namespace std;
 
@@ -35,6 +36,9 @@ const long MAX_INT_I9_SIZE = 2147483647;
 
 // Handles scoping.
 ScopeMgr *sm = ScopeMgr::create();
+
+// Emits the target code.
+CodeGenerator cg;
 
 // Loop block count used for determining if we are inside of
 // a loop block (i.e. for determining legitimacy of break stmt).
@@ -1398,34 +1402,49 @@ expx:
 %%
 
 
-int main() {
-  int tok;
-  int spewTokens = 0;
+int main(int argc, char* argv[])
+{
+    int tok;
+    int spewTokens = 0;
+    
+    // Process the output file name.
+    if (argc == 2)
+    {
+        // File name is argument 2 (index 1).
+        cg.init_out_file(argv[1]);
+    }
+    else
+    {
+        // The file name was not specified.
+        printf("USAGE: ice9 {target_file} < {source_file}");
 
-  if (spewTokens) {
-      while (1) {
-        tok = yylex();
-        if (tok == 0) break;
-        switch (tok) {
-        case TK_ID:
-          printf("ID  : \t\"%s\"\n", yylval.str);
-          break;
-        case TK_INT:
-          //printf("ILIT:\t%d\n", yylval.intt);
-          // Changed int to store as string.
-          printf("ILIT:\t%s\n", yylval.str);
-          break;
-        default:
-          printf("TOK : \t%d\n", tok);
+        return 1;
+    }
+
+    if (spewTokens) {
+        while (1) {
+          tok = yylex();
+          if (tok == 0) break;
+          switch (tok) {
+          case TK_ID:
+            printf("ID  : \t\"%s\"\n", yylval.str);
+            break;
+          case TK_INT:
+            //printf("ILIT:\t%d\n", yylval.intt);
+            // Changed int to store as string.
+            printf("ILIT:\t%s\n", yylval.str);
+            break;
+          default:
+            printf("TOK : \t%d\n", tok);
+          }
         }
-      }
-  }
-  else {
-    // Where the real compile code starts.
-    yyparse();
-  }
+    }
+    else {
+      // Where the real compile code starts.
+      yyparse();
+    }
 
-  delete sm;
+    delete sm;
 
-  return 0;
+    return 0;
 }
