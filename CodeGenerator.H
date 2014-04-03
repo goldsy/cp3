@@ -16,7 +16,11 @@ using namespace std;
 class CodeGenerator {
     private:
         // Out stream
-        ofstream target;
+        ofstream _target;
+
+        // Current line number.
+        int _curr_line_num;
+
 
     public:
         // Default ctor.
