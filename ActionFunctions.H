@@ -12,4 +12,6 @@ bool is_boolean(TypeRec *source);
 bool is_int(TypeRec *rvalue);
 bool are_int(TypeRec *lvalue, TypeRec *rvalue);
 
+string fmt_int(int source);
+
 #endif      /* ACTIONFUNCTIONS_H */

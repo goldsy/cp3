@@ -4,6 +4,7 @@
 #include "ActionFunctions.H"
 #include "ScopeMgr.H"
 #include <stdio.h>
+#include <sstream>
 
 extern ScopeMgr *sm;
 extern bool debugFlag;
@@ -112,4 +113,14 @@ bool are_int(TypeRec *lvalue, TypeRec *rvalue)
     }
 
     return false;
+}
+
+
+string fmt_int(int source)
+{
+    // Format an int into a string for debugging.
+    ostringstream convert;
+    convert << source;
+
+    return convert.str();
 }
