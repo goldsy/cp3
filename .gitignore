@@ -26,6 +26,9 @@ tags
 *.*~
 *.swp
 
+# ice9 source files
+*.9
+
 # Tiny Machine executable and tm machine files.
 tm
 *.tm
