@@ -21,7 +21,7 @@ class VarRec {
         // Type of this varaible.
         TypeRec *_var_type;
 
-        // TODO: Seems logical but shouldn't be needed for P2.
+        // Location in memory.
         int _memory_loc;
 
         // Flag indicating if variable is used as a loop counter.
@@ -48,15 +48,14 @@ class VarRec {
         bool get_loop_counter_flag();
         bool is_const();
         string get_value();
-        // TODO: getter for memory location???
+        int get_memory_loc();
 
 
         // Setters
         void set_loop_counter_flag(bool flag);
         void set_const_flag(bool flag);
         void set_value(string str_value);
-
-        // TODO: setter for memory location???
+        void set_memory_loc(int mem_loc);
 
         // Type equivalence operator
         //static void equiv(const VarRec &lVal, const VarRec &rVal);

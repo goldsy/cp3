@@ -15,6 +15,7 @@ using namespace std;
 
 // Flag used to turn on some debug messages.
 bool debugFlag = false;
+bool tmDebugFlag = true;
 
 extern int yynewlines;
 extern char *yytext;
@@ -148,7 +149,7 @@ list<VarRec *> *proc_var_rec_list = 0;
 
 /* START */
 program:
-       defs stms0 { /* printf("%s\n", sm->knock_knock().c_str()); */ }
+       defs stms0 { cg.emit(HALT, "END OF PROGRAM"); /* printf("%s\n", sm->knock_knock().c_str()); */ }
     ;
 
 
@@ -219,6 +220,32 @@ varlist:
                     errorMsg += "' in this scope";
                     yyerror(errorMsg.c_str());
                     exit(0);
+                }
+
+                // CODE GEN
+                // CODE GEN
+                // CODE GEN
+                if (is_int_or_boolean(target_type))
+                {
+                    // Init space for the bool or int.
+                    // Store the memory loc in the var. Init it to 0.
+                    temp->set_memory_loc(cg.emit_init_int(0, 
+                        "Declare space for var " + temp->get_name() + " of type " +
+                        target_type->get_name()));
+
+                    if (tmDebugFlag)
+                    {
+                        cg.emit_note("Memory Loc of " + temp->get_name() +
+                            " is " + fmt_int(temp->get_memory_loc()));
+                    }
+                }
+                else
+                {
+                    // Otherwise this is string type to allocate.
+                    // TODO: FINISH STRING ALLOCATION.
+                    // TODO: FINISH STRING ALLOCATION.
+                    // TODO: FINISH STRING ALLOCATION.
+                    // THINKING THAT THE SIZE WILL BE STORED RIGHT BEFORE THE STR.
                 }
             }
 
@@ -664,7 +691,7 @@ stm:
         }
 
         // Check if lvalue type = exp type.
-        if (!lvalue_type->equal($<type_rec>3))
+        if (!lvalue_type->equal($<var_rec>3->get_type()))
         {
             // Incompatible types in assignment.
             string errorMsg;
@@ -681,6 +708,37 @@ stm:
             yyerror(errorMsg.c_str());
             exit(0);
         }
+
+        // CODE GEN
+        // CODE GEN
+        // CODE GEN
+        if (tmDebugFlag)
+        {
+            cg.emit_note("------- BEGIN ASSIGNMENT ---------");
+        }
+
+        if (is_int_or_boolean($<var_rec>1->get_type()))
+        {
+            // Bools and ints will have the same TM code.
+            // Load lvalue into register if necessary.
+            // Load exp into register if necessary.
+            int lhs_reg = cg.get_reg_assign($<var_rec>1);
+            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+
+            cg.emit_load_value(lhs_reg, 0, rhs_reg, "Assignment of " +
+                $<var_rec>3->get_name() + " to " + $<var_rec>1->get_name());
+        }
+        else
+        {
+            // Otherwise we are dealing with a string.
+            // TODO: FINISH STRING ASSIGNMENT.
+        }
+
+        if (tmDebugFlag)
+        {
+            cg.emit_note("------- END ASSIGNMENT ---------");
+        }
+
    }
    | TK_WRITE exp TK_SEMI
     {
@@ -688,14 +746,41 @@ stm:
         TypeRec *string_rec = sm->lookup_type("string");
         TypeRec *int_rec = sm->lookup_type("int");
 
-        if (!string_rec->equal($<type_rec>2)
-            && !int_rec->equal($<type_rec>2))
+        if (!string_rec->equal($<var_rec>2->get_type())
+            && !int_rec->equal($<var_rec>2->get_type()))
         {
             // Type is not string or int.
             string errorMsg;
             errorMsg = "Invalid type: write expression must be string or int type";
             yyerror(errorMsg.c_str());
             exit(0);
+        }
+
+        // CODE GEN
+        // CODE GEN
+        // CODE GEN
+        if (tmDebugFlag)
+        {
+            cg.emit_note("------- BEGIN WRITE ---------");
+        }
+
+        int rhs_reg = cg.get_reg_assign($<var_rec>2);    
+
+        if (is_int($<var_rec>2->get_type()))
+        {
+            // Write as an integer.
+            cg.emit_io(OUT, rhs_reg, "Writing int value of var " + 
+                $<var_rec>2->get_name());
+            cg.emit(OUTNL, "Writing NL");
+        }
+        else
+        {
+            // TODO: EMIT STRING WRITE HERE
+        }
+
+        if (tmDebugFlag)
+        {
+            cg.emit_note("------- END WRITE ---------");
         }
     }
    | TK_WRITES exp TK_SEMI
@@ -704,14 +789,40 @@ stm:
         TypeRec *string_rec = sm->lookup_type("string");
         TypeRec *int_rec = sm->lookup_type("int");
 
-        if (!string_rec->equal($<type_rec>2)
-            && !int_rec->equal($<type_rec>2))
+        if (!string_rec->equal($<var_rec>2->get_type())
+            && !int_rec->equal($<var_rec>2->get_type()))
         {
             // Type is not string or int.
             string errorMsg;
             errorMsg = "Invalid type: writes expression must be string or int type";
             yyerror(errorMsg.c_str());
             exit(0);
+        }
+
+        // CODE GEN
+        // CODE GEN
+        // CODE GEN
+        if (tmDebugFlag)
+        {
+            cg.emit_note("------- BEGIN WRITES ---------");
+        }
+
+        int rhs_reg = cg.get_reg_assign($<var_rec>2);    
+
+        if (is_int($<var_rec>2->get_type()))
+        {
+            // Write as an integer.
+            cg.emit_io(OUT, rhs_reg, "Writing int value of var " + 
+                $<var_rec>2->get_name());
+        }
+        else
+        {
+            // TODO: EMIT STRING WRITE*S* HERE
+        }
+
+        if (tmDebugFlag)
+        {
+            cg.emit_note("------- END WRITES ---------");
         }
     }
    | exp TK_SEMI
@@ -724,7 +835,7 @@ if:
     // exp must be a bool.
     TypeRec *bool_rec = sm->lookup_type("bool");
 
-    if (!bool_rec->equal($<type_rec>2))
+    if (!bool_rec->equal($<var_rec>2->get_type()))
     {
         // Type is not boolean.
         string errorMsg;
@@ -742,7 +853,7 @@ if2:
         // exp must be a bool.
         TypeRec *bool_rec = sm->lookup_type("bool");
 
-        if (!bool_rec->equal($<type_rec>3))
+        if (!bool_rec->equal($<var_rec>3->get_type()))
         {
             // Type is not boolean.
             string errorMsg;
@@ -764,7 +875,7 @@ do:
     // exp must be a bool.
     TypeRec *bool_rec = sm->lookup_type("bool");
 
-    if (!bool_rec->equal($<type_rec>3))
+    if (!bool_rec->equal($<var_rec>3->get_type()))
     {
         // Type is not boolean.
         string errorMsg;
@@ -792,8 +903,8 @@ fa:
         TypeRec *int_rec = sm->lookup_type("int");
 
         // Both expressions must be an int.
-        if (!int_rec->equal($<type_rec>5)
-            || !int_rec->equal($<type_rec>7))
+        if (!int_rec->equal($<var_rec>5->get_type())
+            || !int_rec->equal($<var_rec>7->get_type()))
         {
             // Variable undefined.
             string errorMsg;
@@ -911,7 +1022,7 @@ lvalue2:
        /* empty rule */     { $$ = 0; }
       | TK_LBRACK exp TK_RBRACK lvalue2 {
         // Array dereference; exp must be int.
-        if (!is_int($<type_rec>2))
+        if (!is_int($<var_rec>2->get_type()))
         {
             string errorMsg;
             errorMsg = "Invalid type. Int required for array dereference";
@@ -953,26 +1064,48 @@ exp:
 
             // Look up the int type.
             TypeRec *target_type = sm->lookup_type("int");
-            $$ = new VarRec("int_literal", target_type, true, $<str>1);
-            //$$ = sm->lookup_type("int");
+            $$ = new VarRec("@int_literal", target_type, true, $<str>1);
+
+
+            // CODE GEN
+            // CODE GEN
+            // CODE GEN
+            $$->set_memory_loc(cg.emit_init_int(atoi($$->get_value().c_str()), 
+                "Storing int literal " + $$->get_value()));
         }
    | TK_TRUE    
     { 
         TypeRec *target_type = sm->lookup_type("bool");
-        $$ = new VarRec("bool_literal", target_type, true, "1");
-        //$$ = sm->lookup_type("bool"); 
+        $$ = new VarRec("@bool_literal_true", target_type, true, "1");
+
+
+        // CODE GEN
+        // CODE GEN
+        // CODE GEN
+        $$->set_memory_loc(cg.emit_init_int(atoi($$->get_value().c_str()), 
+            "Storing bool literal true " + $$->get_value()));
     }
    | TK_FALSE
     { 
         TypeRec *target_type = sm->lookup_type("bool");
-        $$ = new VarRec("bool_literal", target_type, true, "0");
-        //$$ = sm->lookup_type("bool"); 
+        $$ = new VarRec("@bool_literal_false", target_type, true, "0");
+
+
+        // CODE GEN
+        // CODE GEN
+        // CODE GEN
+        $$->set_memory_loc(cg.emit_init_int(atoi($$->get_value().c_str()), 
+            "Storing bool literal false " + $$->get_value()));
     }
    | TK_SLIT    
     { 
         TypeRec *target_type = sm->lookup_type("string");
         $$ = new VarRec("string_literal", target_type, true, $<str>1);
-        //$$ = sm->lookup_type("string"); 
+
+        // CODE GEN
+        // CODE GEN
+        // CODE GEN
+        // TODO: DO STRINGS LATER. REMEMBER DROP SIZE BEFORE STRING CHARS.
     }
    | TK_READ    
     { 
@@ -983,14 +1116,19 @@ exp:
         //      FOR NOW JUST RETURN A KNOWN VALUE THAT CAN BE TESTED.
         //      FOR NOW JUST RETURN A KNOWN VALUE THAT CAN BE TESTED.
         //      FOR NOW JUST RETURN A KNOWN VALUE THAT CAN BE TESTED.
-        $$ = new VarRec("int_literal", target_type, true, "0");
-        //$$ = sm->lookup_type("int"); 
+        $$ = new VarRec("@int_literal", target_type, true, "0");
+
+
+        // CODE GEN
+        // CODE GEN
+        // CODE GEN
+        // Emit an IN and get a register to store it in.
+        int rhs_reg = cg.get_reg_assign($$);
+        cg.emit_io(IN, rhs_reg, "Read int from user.");
     }
-   | TK_MINUS exp  {
+   | TK_MINUS exp  
+    {
         if (is_int_or_boolean($<var_rec>2->get_type())) {
-            // TODO: PERFORM UNARY MINUS OP ON EXP.
-            // TODO: PERFORM UNARY MINUS OP ON EXP.
-            // TODO: PERFORM UNARY MINUS OP ON EXP.
             $$ = $<var_rec>2;
         }
         else {
@@ -998,8 +1136,23 @@ exp:
             yyerror("Incompatible type for unary minus");
             exit(0);
         }
-        }
-   | TK_QUEST exp  {
+
+
+        // CODE GEN
+        // CODE GEN
+        // CODE GEN
+        // TODO: PERFORM UNARY MINUS OP ON EXP.
+        int rhs_reg = cg.get_reg_assign($$);
+
+        // Get available register for temp use.
+        int neg_one_reg = cg.get_reg_assign(0);
+
+        // To make this negative just create a -1 register and multiply.
+        cg.emit_load_value(neg_one_reg, -1, ZERO_REG, "Load -1 into register");
+        cg.emit_math(MUL, rhs_reg, neg_one_reg, rhs_reg, "Unary minus op");
+    }
+   | TK_QUEST exp  
+    {
         if (is_boolean($<var_rec>2->get_type())) {
             // Question returns an int type.
             TypeRec *target_type = sm->lookup_type("int");
@@ -1012,14 +1165,20 @@ exp:
             //      NOT EITHER.
             $$ = new VarRec("quest_rtn_val", target_type, true,
                 $<var_rec>2->get_value());
-            //$$ = sm->lookup_type("int");
         }
         else {
             // TYPE ERROR!
             yyerror("Incompatible type for unary question operator");
             exit(0);
         }
-        }
+
+
+        // CODE GEN
+        // CODE GEN
+        // CODE GEN
+        // NOTE: THIS IS A SEMANTIC CHANGE. MY ASSUMPTION IS THAT WHATEVER I DECIDE
+        // REPRESENTS TRUE (1) AND FALSE (0) WILL BECOME THE INT I ASSIGNED.
+    }
    | TK_ID TK_LPAREN TK_RPAREN
         {
             // Parameter-less proc call.
@@ -1056,8 +1215,6 @@ exp:
                         // There is no return value.
                         $$ = 0;
                     }
-
-                    //$$ = proc_target->get_return_type();
                 }
             }
             else
@@ -1070,6 +1227,14 @@ exp:
                 yyerror(errorMsg.c_str());
                 exit(0);
             }
+
+
+            // CODE GEN
+            // CODE GEN
+            // CODE GEN
+            // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED IF ONE.
+            // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED IF ONE.
+            // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED IF ONE.
         }
    | TK_ID TK_LPAREN expx TK_RPAREN
         {
@@ -1142,8 +1307,6 @@ exp:
                     // There is no return value.
                     $$ = 0;
                 }
-
-                //$$ = proc_target->get_return_type();
             }
             else
             {
@@ -1160,6 +1323,14 @@ exp:
             // the type symbol table so we can just throw the list
             // away without concern for the pointers.
             delete $<var_rec_list>3;
+
+
+            // CODE GEN
+            // CODE GEN
+            // CODE GEN
+            // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED IF ONE.
+            // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED IF ONE.
+            // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED IF ONE.
         }
    | exp TK_PLUS exp
     {
@@ -1167,21 +1338,49 @@ exp:
         {
             VarRec *rtn_var = new VarRec("addition_return", $<var_rec>1->get_type());
 
-            // TODO: PERFORM PLUS OP ON THE TWO EXP
-            // POSSIBLY RETURN THE VARIABLE FOR THE ACCUMULATOR?????
+            // CODE GEN
+            // CODE GEN
+            // CODE GEN
+            // Assign the return value to the accumulator.
+            cg.assign_to_ac(rtn_var);
+            int lhs_reg = cg.get_reg_assign($<var_rec>1);
+            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+
             if (is_int($<var_rec>1->get_type()))
             {
                 // Do integer addition.
-                // TODO: EMIT INTEGER ADDITION CODE HERE.
+                cg.emit_math(ADD, AC_REG, lhs_reg, rhs_reg, "PLUS INT OP");
             }
             else
             {
-                // Do boolean addition op.
+                // Do boolean OR.
+                if (tmDebugFlag)
+                {
+                    cg.emit_note("------- BEGIN BOOLEAN PLUS (OR) ---------");
+                }
+
                 // TODO: EMIT BOOLEAN ADDITION CODE HERE.
+                cg.emit_math(ADD, AC_REG, lhs_reg, rhs_reg, "ADD to check bool OR.");
+                // If false skip then.
+                cg.emit_jump(JEQ, AC_REG, 2, PC_REG,
+                    "If BOOL == 0 skip next 2 lines.");
+
+                // Then True = set return to 1.
+                cg.emit_load_value(AC_REG, 1, ZERO_REG, "Set return val to true 1.");
+                // Skip the else stmt.
+                cg.emit_jump(JEQ, ZERO_REG, 1, PC_REG, 
+                    "Unconditional jump - skip else");
+
+                // Then True = set return to 1.
+                cg.emit_load_value(AC_REG, 0, ZERO_REG, "Set return val to false 0.");
+
+                if (tmDebugFlag)
+                {
+                    cg.emit_note("------- END BOOLEAN PLUS (OR) ---------");
+                }
             }
 
             $$ = rtn_var;
-            //$$ = $<var_rec>1;
         }
         else 
         {
@@ -1209,7 +1408,7 @@ exp:
     }
    | exp TK_STAR exp
     {
-        if (are_int_or_boolean($<type_rec>1, $<type_rec>3)) {
+        if (are_int_or_boolean($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
             VarRec *rtn_var = new VarRec("starop_return", $<var_rec>1->get_type());
 
             // TODO: PERFORM STAR OP ON THE TWO EXP
@@ -1236,7 +1435,7 @@ exp:
     }
    | exp TK_SLASH exp
     {
-        if (are_int($<type_rec>1, $<type_rec>3)) {
+        if (are_int($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
             VarRec *rtn_var = new VarRec("division_return", $<var_rec>1->get_type());
 
             // Do integer division.
@@ -1252,7 +1451,7 @@ exp:
     }
    | exp TK_MOD exp
     {
-        if (are_int($<type_rec>1, $<type_rec>3)) {
+        if (are_int($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
             VarRec *rtn_var = new VarRec("mod_return", $<var_rec>1->get_type());
 
             // Do integer modulus.
@@ -1270,7 +1469,7 @@ exp:
     }
    | exp TK_EQ exp
     {
-        if (are_int_or_boolean($<type_rec>1, $<type_rec>3)) {
+        if (are_int_or_boolean($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
             // Equal comparison always returns boolean type.
             VarRec *rtn_var = new VarRec("EQ_return", sm->lookup_type("bool"));
 
@@ -1288,7 +1487,7 @@ exp:
     }
    | exp TK_NEQ exp
     {
-        if (are_int_or_boolean($<type_rec>1, $<type_rec>3)) {
+        if (are_int_or_boolean($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
             // Not equal comparison always returns boolean type.
             VarRec *rtn_var = new VarRec("NEQ_return", sm->lookup_type("bool"));
 
@@ -1306,7 +1505,7 @@ exp:
     }
    | exp TK_GT exp
     {
-        if (are_int($<type_rec>1, $<type_rec>3)) {
+        if (are_int($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
             // Greater than comparison always returns boolean type.
             VarRec *rtn_var = new VarRec("GT_return", sm->lookup_type("bool"));
 
@@ -1324,7 +1523,7 @@ exp:
     }
    | exp TK_LT exp
     {
-        if (are_int($<type_rec>1, $<type_rec>3)) {
+        if (are_int($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
             // Less than comparison always returns boolean type.
             VarRec *rtn_var = new VarRec("LT_return", sm->lookup_type("bool"));
 
@@ -1342,7 +1541,7 @@ exp:
     }
    | exp TK_GE exp
     {
-        if (are_int($<type_rec>1, $<type_rec>3)) {
+        if (are_int($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
             // Greater than equal comparison always returns boolean type.
             VarRec *rtn_var = new VarRec("GE_return", sm->lookup_type("bool"));
 
@@ -1360,7 +1559,7 @@ exp:
     }
    | exp TK_LE exp
     {
-        if (are_int($<type_rec>1, $<type_rec>3)) {
+        if (are_int($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
             // Less than or equal comparison always returns boolean type.
             VarRec *rtn_var = new VarRec("LE_return", sm->lookup_type("bool"));
 

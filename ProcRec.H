@@ -27,7 +27,7 @@ class ProcRec {
         // Determines if a forward added it.
         bool _is_forward_decl;
 
-        // TODO: Seems logical but shouldn't be needed for P2.
+        // Location in memory.
         int _memory_loc;
 
 

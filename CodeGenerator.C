@@ -2,6 +2,7 @@
 
 
 #include "CodeGenerator.H"
+#include "ActionFunctions.H"
 #include <sstream>
 
 using namespace std;
@@ -11,6 +12,25 @@ using namespace std;
 CodeGenerator::CodeGenerator()
 {
     _curr_line_num = 0;
+
+    // Zero is reserved for the size of data.
+    _next_data_addr = 1;
+
+    // Sized to 5 because I want reg 0 as my 0 value register
+    // and this will make sure indexes 1-4 align with register
+    // numbers 1-4. Index zero will never be used.
+    // Reg 5 - Accumulator
+    // Reg 6 - Stack Ptr
+    // Reg 7 - PC
+    _reg_assign.resize(6);
+
+    for (int index = 0; static_cast<unsigned int>(index) < _reg_assign.size(); ++index)
+    {
+        _reg_assign[index] = 0;
+    }
+
+    // Don't use register 0.
+    _next_assignment = 1;
 }
 
 
@@ -35,8 +55,15 @@ int CodeGenerator::get_curr_line()
 // This method just returns the line number.
 string CodeGenerator::get_fmt_curr_line()
 {
+    return get_fmt_line(_curr_line_num);
+}
+
+
+// This method just returns the line number.
+string CodeGenerator::get_fmt_line(int line_num)
+{
     ostringstream convert;
-    convert << _curr_line_num;
+    convert << line_num;
 
     return (convert.str() + ": ");
 }
@@ -92,11 +119,11 @@ int CodeGenerator::emit(TmOp code, string note)
 
     if (code == HALT)
     {
-        _output_file << "HALT";
+        _output_file << "HALT 0,0,0";
     }
     else if (code == OUTNL)
     {
-        _output_file << "OUTNL";
+        _output_file << "OUTNL 0,0,0";
     }
     else
     {
@@ -149,6 +176,7 @@ int CodeGenerator::emit_io(TmOp code, int result_reg, string note)
     }
 
     _output_file << " " << result_reg;
+    _output_file << ",0,0";
     _output_file << NOTE_PADDING << note;
     _output_file << endl;
 
@@ -268,36 +296,35 @@ int CodeGenerator::emit_jump(
         int test_reg,
         int lhs_value,
         int rhs_reg,
-        string note
+        string note,
+        int bk_patch_line
         )
 {
-    int target_line = get_curr_line();
-
-    _output_file << get_fmt_curr_line();
+    string fmt_code;
 
     if (code == JLT)
     {
-        _output_file << "JLT";
+        fmt_code = "JLT";
     }
     else if (code == JLE)
     {
-        _output_file << "JLE";
+        fmt_code = "JLE";
     }
     else if (code == JEQ)
     {
-        _output_file << "JEQ";
+        fmt_code = "JEQ";
     }
     else if (code == JNE)
     {
-        _output_file << "JNE";
+        fmt_code = "JNE";
     }
     else if (code == JGE)
     {
-        _output_file << "JGE";
+        fmt_code = "JGE";
     }
     else if (code == JGT)
     {
-        _output_file << "JGT";
+        fmt_code = "JGT";
     }
     else
     {
@@ -306,26 +333,38 @@ int CodeGenerator::emit_jump(
         return -1;
     }
 
-    _output_file << " " << test_reg;
-    _output_file << ", " << lhs_value << ", (" << rhs_reg << ")";
-
-    _output_file << NOTE_PADDING << note;
-    _output_file << endl;
-
-    ++_curr_line_num;
-
-    return target_line;
+    return emit_displacement_fmt(fmt_code, test_reg, lhs_value, 
+            rhs_reg, note, bk_patch_line);
 }
 
 
 // Generic result, displacement, reg value formater.
-int CodeGenerator::emit_displacement_fmt(string fmt_opcode, int result_reg,
-        int lhs_value, int rhs_reg, string note)
+int CodeGenerator::emit_displacement_fmt(
+        string fmt_opcode, 
+        int result_reg,
+        int lhs_value, 
+        int rhs_reg, 
+        string note,
+        int bk_patch_line)
 {
-    int target_line = get_curr_line();
+    int target_line;
+
+    if (bk_patch_line < 0)
+    {
+        target_line = get_curr_line();
+
+        // Increment the line here because the back patch
+        // case is only going back and filling in an unknown.
+        // It already has moved past here.
+        ++_curr_line_num;
+    }
+    else
+    {
+        target_line = bk_patch_line;
+    }
 
     // ###: OPCODE r, d(s)
-    _output_file << get_fmt_curr_line();
+    _output_file << get_fmt_line(target_line);
     _output_file << fmt_opcode;
     _output_file << " " << result_reg;
     _output_file << ", " << lhs_value << "(" << rhs_reg << ")";
@@ -333,9 +372,14 @@ int CodeGenerator::emit_displacement_fmt(string fmt_opcode, int result_reg,
     _output_file << NOTE_PADDING << note;
     _output_file << endl;
 
-    ++_curr_line_num;
-
     return target_line;
+}
+
+
+// This just emits a comment. No line number change.
+void CodeGenerator::emit_note(string note)
+{
+    _output_file << "* " << note << endl;
 }
 
 
@@ -345,3 +389,84 @@ void CodeGenerator::error(TmOp code, string funct)
     cerr << "Line: " << _curr_line_num << " - Invalid code [" <<
         code << "] provided to " << funct << endl;
 }
+
+
+// Determines if the specified variable is already loaded into a register.
+int CodeGenerator::is_loaded(VarRec *source)
+{
+    int reg_assignment = 0;
+    int index = 1;
+
+    while ((reg_assignment == 0) && (static_cast<unsigned int>(index) < _reg_assign.size()))
+    {
+        if (_reg_assign[index] == source)
+        {
+            reg_assignment = index;
+        }
+
+        ++index;
+    }
+
+    return reg_assignment;
+}
+
+
+// This function returns the next register assignment. If necessary
+// it spills before returning the register number and updates the vector.
+int CodeGenerator::get_reg_assign(VarRec *source)
+{
+    int reg_assignment = is_loaded(source);
+
+    if (!reg_assignment)
+    {
+        // Variable isn't already loaded. Find next register and
+        // see if it needs to be spilled.
+        if (_reg_assign[_next_assignment])
+        {
+            // Spill the value back to memory.
+            emit_store_mem(_next_assignment, source->get_memory_loc(), ZERO_REG,
+                    "Spill register " + fmt_int(_next_assignment) + 
+                    " back to memory loc: " + fmt_int(source->get_memory_loc()));
+        }
+
+        // Only load from memory if it was stored in memory. The
+        // temps won't (like the AC).
+        // And in the case of the unary minus we mult. by -1 which is neither
+        // in memory nor has a corresponding VarRec.
+        if (source && source->get_memory_loc())
+        {
+            emit_load_mem(_next_assignment, source->get_memory_loc(), ZERO_REG,
+                    "LOADING var " + source->get_name() + " to reg num " +
+                    fmt_int(_next_assignment));
+        }
+
+        _reg_assign[_next_assignment] = source;
+        reg_assignment = _next_assignment;
+        advance_next_assignment();
+    }
+
+    return reg_assignment;
+}
+
+
+// Round robin the next assignment number.
+void CodeGenerator::advance_next_assignment()
+{
+    ++_next_assignment;
+
+    // This reserves first and last register numbers, but has then in the
+    // vector.
+    if (static_cast<unsigned int>(_next_assignment) > (_reg_assign.size() - 2))
+    {
+        // Turn the corner.
+        _next_assignment = 1;
+    }
+}
+
+
+// Assign the source variable record to the accumulator.
+void CodeGenerator::assign_to_ac(VarRec *source)
+{
+    _reg_assign[AC_REG] = source;
+}
+

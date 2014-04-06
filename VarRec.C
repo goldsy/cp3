@@ -17,6 +17,11 @@ VarRec::VarRec(
     _loop_counter_flag = false;
     _const_flag = const_flag;
     _str_value = init_value;
+
+    // This is the size of memory. Must never write here but using
+    // zero allows for easy testing if it is set. Temp vars won't
+    // have a value.
+    _memory_loc = 0;
 }
 
 
@@ -50,6 +55,12 @@ string VarRec::get_value()
 }
 
 
+int VarRec::get_memory_loc()
+{
+    return _memory_loc;
+}
+
+
 void VarRec::set_loop_counter_flag(bool flag)
 {
     _loop_counter_flag = flag;
@@ -71,4 +82,10 @@ void VarRec::set_value(string str_value)
     }
 
     _str_value = str_value;
+}
+
+
+void VarRec::set_memory_loc(int mem_loc)
+{
+    _memory_loc = mem_loc;
 }

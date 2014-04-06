@@ -4,14 +4,23 @@
 #define CODEGENERATOR_H
 
 
+#include "VarRec.H"
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <vector>
 
 
 using namespace std;
 
-const string NOTE_PADDING = "\t\t";
+const string NOTE_PADDING = "\t\t\t";
+
+// The register that will always contain the 0 value.
+const int ZERO_REG = 0;
+const int AC_REG = 5; /* TODO: NOT SURE IF THIS IS NEEDED YET. */
+const int STACK_REG = 6; /* TODO: NOT SURE IF THIS IS NEEDED YET. */
+const int PC_REG = 7;
+
 
 // Put all TM op codes in the same enum to ensure that numbers won't be reused
 // between groupings even though each group will be handled separately to make
@@ -67,7 +76,26 @@ class CodeGenerator {
 
         // Generic result, displacement, reg value formater.
         int emit_displacement_fmt(string fmt_code, int result_reg, 
-                int lhs_value, int rhs_reg, string note);
+                int lhs_value, int rhs_reg, string note, int bk_patch_line = -1);
+
+        // Get the current output line number formatted for TM output.
+        string get_fmt_line(int line_num);
+
+
+        // Vector of VarRec ptrs for register assignment and spilling.
+        vector<VarRec *> _reg_assign;
+
+        // This variable indicates the next register to be used to
+        // load a value into. It will round robin with the hope that
+        // the last loaded value will be the most likely to be no longer
+        // live. The a register's number comes up it will be inspected to
+        // see if it has a pointer and if so it will spill and the newly
+        // loaded variable will take the spilled ones place.
+        int _next_assignment;
+
+        // Function to implement the round robin register assignment.
+        void advance_next_assignment();
+
 
     public:
         // Default ctor.
@@ -119,10 +147,24 @@ class CodeGenerator {
 
         // This emit is used for jumps.
         int emit_jump(TmOp code, int test_reg, int lhs_value, 
-                int rhs_reg, string note);
+                int rhs_reg, string note, int bk_patch_line = -1);
+
+        // This just emits a comment. No line number change.
+        void emit_note(string note);
 
         // Report when something seriously went wrong.
         void error(TmOp code, string funct);
+
+
+        // Determines if the specified variable is already loaded into a register.
+        int is_loaded(VarRec *source);
+
+        // This function returns the next register assignment. If necessary
+        // it spills before returning the register number and updates the vector.
+        int get_reg_assign(VarRec *source);
+
+        // This method assigns the specified variable record to the AC register.
+        void assign_to_ac(VarRec *source);
 };
 
 #endif      /* CODEGENERATOR_H */
