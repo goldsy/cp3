@@ -149,7 +149,11 @@ list<VarRec *> *proc_var_rec_list = 0;
 
 /* START */
 program:
-       defs stms0 { cg.emit(HALT, "END OF PROGRAM"); /* printf("%s\n", sm->knock_knock().c_str()); */ }
+       defs stms0 
+        { 
+            /* printf("%s\n", sm->knock_knock().c_str()); */ 
+            cg.emit(HALT, "END OF PROGRAM"); 
+        }
     ;
 
 
@@ -663,7 +667,7 @@ stm:
    | do
    | fa
    | TK_BREAK TK_SEMI
-   {
+    {
         // Make sure that we are in a loop.
         if ((fa_count < 1) && (do_count < 1))
         {
@@ -673,11 +677,27 @@ stm:
             yyerror(errorMsg.c_str());
             exit(0);
         }
-   }
+
+        // TODO: ADD MACHINE CODE TO RETURN FROM FA OR DO.
+        // TODO: ADD MACHINE CODE TO RETURN FROM FA OR DO.
+        // TODO: ADD MACHINE CODE TO RETURN FROM FA OR DO.
+        // BACK PATCH JUMP OVER END OF LOOP.
+    }
    | TK_EXIT TK_SEMI
+    {
+        // CODE GEN
+        // CODE GEN
+        // CODE GEN
+        cg.emit(HALT, "EXIT PROGRAM"); 
+    }
    | TK_RETURN TK_SEMI
+    {
+        // TODO: ADD MACHINE CODE TO RETURN FROM FUNCTION.
+        // TODO: ADD MACHINE CODE TO RETURN FROM FUNCTION.
+        // TODO: ADD MACHINE CODE TO RETURN FROM FUNCTION.
+    }
    | lvalue TK_ASSIGN exp TK_SEMI
-   {
+    {
         // Check if lvalue is an array. Arrays are not assignable.
         TypeRec *lvalue_type = $<var_rec>1->get_type();
 
@@ -731,7 +751,7 @@ stm:
         else
         {
             // Otherwise we are dealing with a string.
-            // TODO: FINISH STRING ASSIGNMENT.
+            // TODO: FINISH EMIT STRING ASSIGNMENT.
         }
 
         if (tmDebugFlag)
@@ -739,7 +759,7 @@ stm:
             cg.emit_note("------- END ASSIGNMENT ---------");
         }
 
-   }
+    }
    | TK_WRITE exp TK_SEMI
     {
         // exp must be a string or int.
