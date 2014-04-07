@@ -127,10 +127,10 @@ list<VarRec *> *proc_var_rec_list = 0;
 
 %start program
 
-%right TK_QUEST
-%left TK_STAR TK_SLASH TK_MOD
-%left TK_PLUS TK_MINUS
 %nonassoc TK_EQ TK_NEQ TK_GT TK_LT TK_GE TK_LE
+%left TK_PLUS TK_MINUS
+%left TK_STAR TK_SLASH TK_MOD
+%right TK_QUEST
 
 %type <var_rec> exp
 %type <var_rec_list> expx
