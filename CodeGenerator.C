@@ -87,7 +87,8 @@ int CodeGenerator::emit_init_int(int data, string note)
     //
     ++_next_data_addr;
 
-    _output_file << ".DATA " << data << NOTE_PADDING << note << endl;
+    _output_file << ".DATA " << data << NOTE_PADDING << note;
+    _output_file << " [" << fmt_int(target_addr) << "]" << endl;
 
     return target_addr;
 }
@@ -424,9 +425,12 @@ int CodeGenerator::get_reg_assign(VarRec *source)
         if (_reg_assign[_next_assignment])
         {
             // Spill the value back to memory.
-            emit_store_mem(_next_assignment, source->get_memory_loc(), ZERO_REG,
+            emit_store_mem(_next_assignment, 
+                    _reg_assign[_next_assignment]->get_memory_loc(), 
+                    ZERO_REG,
                     "Spill register " + fmt_int(_next_assignment) + 
-                    " back to memory loc: " + fmt_int(source->get_memory_loc()));
+                        " back to memory loc: " + 
+                        fmt_int(_reg_assign[_next_assignment]->get_memory_loc()));
         }
 
         // Only load from memory if it was stored in memory. The

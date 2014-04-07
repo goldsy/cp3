@@ -1141,7 +1141,9 @@ exp:
         // CODE GEN
         // CODE GEN
         // CODE GEN
-        // TODO: PERFORM UNARY MINUS OP ON EXP.
+        // TODO: UNARY MINUS OP ON EXP MIGHT NOT CHANGE VALUE IN VARIABLE.
+        // TODO: UNARY MINUS OP ON EXP MIGHT NOT CHANGE VALUE IN VARIABLE.
+        // TODO: UNARY MINUS OP ON EXP MIGHT NOT CHANGE VALUE IN VARIABLE.
         int rhs_reg = cg.get_reg_assign($$);
 
         // Get available register for temp use.
@@ -1176,8 +1178,8 @@ exp:
         // CODE GEN
         // CODE GEN
         // CODE GEN
-        // NOTE: THIS IS A SEMANTIC CHANGE. MY ASSUMPTION IS THAT WHATEVER I DECIDE
-        // REPRESENTS TRUE (1) AND FALSE (0) WILL BECOME THE INT I ASSIGNED.
+        // NOTE: THIS IS A SEMANTIC CHANGE. MY ASSUMPTION IS THAT 
+        //      TRUE (1) AND FALSE (0) WILL BECOME THE INT.
     }
    | TK_ID TK_LPAREN TK_RPAREN
         {
@@ -1341,10 +1343,13 @@ exp:
             // CODE GEN
             // CODE GEN
             // CODE GEN
-            // Assign the return value to the accumulator.
-            cg.assign_to_ac(rtn_var);
             int lhs_reg = cg.get_reg_assign($<var_rec>1);
             int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+
+            // Assign the return value to the accumulator.
+            // Must check this after getting the rhs and lhs assignments because
+            // one of them may have been assigned to the AC.
+            cg.assign_to_ac(rtn_var);
 
             if (is_int($<var_rec>1->get_type()))
             {
@@ -1359,19 +1364,20 @@ exp:
                     cg.emit_note("------- BEGIN BOOLEAN PLUS (OR) ---------");
                 }
 
-                // TODO: EMIT BOOLEAN ADDITION CODE HERE.
                 cg.emit_math(ADD, AC_REG, lhs_reg, rhs_reg, "ADD to check bool OR.");
-                // If false skip then.
+
+                // If false skip "then".
                 cg.emit_jump(JEQ, AC_REG, 2, PC_REG,
                     "If BOOL == 0 skip next 2 lines.");
 
-                // Then True = set return to 1.
+                // "Then" True = set return to 1.
                 cg.emit_load_value(AC_REG, 1, ZERO_REG, "Set return val to true 1.");
-                // Skip the else stmt.
+
+                // Skip the "else" stmt.
                 cg.emit_jump(JEQ, ZERO_REG, 1, PC_REG, 
                     "Unconditional jump - skip else");
 
-                // Then True = set return to 1.
+                // "Else" False = set return to 0.
                 cg.emit_load_value(AC_REG, 0, ZERO_REG, "Set return val to false 0.");
 
                 if (tmDebugFlag)
@@ -1396,8 +1402,32 @@ exp:
             VarRec *rtn_var = new VarRec("subtr_return", $<var_rec>1->get_type());
 
             // Do integer subtraction.
-            // TODO: EMIT INTEGER SUBTRACTION CODE HERE.
             $$ = rtn_var;
+
+            // CODE GEN
+            // CODE GEN
+            // CODE GEN
+            if (tmDebugFlag)
+            {
+                cg.emit_note("------- BEGIN INT SUBTRACTION ---------");
+            }
+
+            // Get rhs and lhs register assignments.
+            int lhs_reg = cg.get_reg_assign($<var_rec>1);
+            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+
+            // Assign the return value to the accumulator.
+            // Must check this after getting the rhs and lhs assignments because
+            // one of them may have been assigned to the AC.
+            cg.assign_to_ac(rtn_var);
+
+            // Do integer subtraction.
+            cg.emit_math(SUB, AC_REG, lhs_reg, rhs_reg, "BINARY MINUS INT OP");
+
+            if (tmDebugFlag)
+            {
+                cg.emit_note("------- END INT SUBTRACTION ---------");
+            }
         }
         else 
         {
@@ -1411,21 +1441,37 @@ exp:
         if (are_int_or_boolean($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
             VarRec *rtn_var = new VarRec("starop_return", $<var_rec>1->get_type());
 
-            // TODO: PERFORM STAR OP ON THE TWO EXP
-            // POSSIBLY RETURN THE VARIABLE FOR THE ACCUMULATOR?????
+            // Get the exp register assignments.
+            int lhs_reg = cg.get_reg_assign($<var_rec>1);
+            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+
+            // Assign the return value to the accumulator.
+            // Must check this after getting the rhs and lhs assignments because
+            // one of them may have been assigned to the AC.
+            cg.assign_to_ac(rtn_var);
+
             if (is_int($<var_rec>1->get_type()))
             {
                 // Do integer multiplication.
-                // TODO: EMIT INTEGER MULTIPLICATION CODE HERE.
+                cg.emit_math(MUL, AC_REG, lhs_reg, rhs_reg, "MULTIPLY INT OP");
             }
             else
             {
-                // Do boolean multiplication op.
-                // TODO: EMIT BOOLEAN MULTIPLICATION CODE HERE.
+                // Do boolean AND.
+                if (tmDebugFlag)
+                {
+                    cg.emit_note("------- BEGIN BOOLEAN PLUS (AND) ---------");
+                }
+
+                cg.emit_math(MUL, AC_REG, lhs_reg, rhs_reg, "MUL to check bool AND.");
+
+                if (tmDebugFlag)
+                {
+                    cg.emit_note("------- END BOOLEAN PLUS (AND) ---------");
+                }
             }
 
             $$ = rtn_var;
-            //$$ = $<type_rec>1;
         }
         else {
             // TYPE ERROR!
@@ -1439,9 +1485,32 @@ exp:
             VarRec *rtn_var = new VarRec("division_return", $<var_rec>1->get_type());
 
             // Do integer division.
-            // TODO: EMIT INTEGER DIVISION CODE HERE.
             $$ = rtn_var;
-            //$$ = $<type_rec>1;
+
+            // CODE GEN
+            // CODE GEN
+            // CODE GEN
+            if (tmDebugFlag)
+            {
+                cg.emit_note("------- BEGIN INT DIVISION ---------");
+            }
+
+            // Get rhs and lhs register assignments.
+            int lhs_reg = cg.get_reg_assign($<var_rec>1);
+            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+
+            // Assign the return value to the accumulator.
+            // Must check this after getting the rhs and lhs assignments because
+            // one of them may have been assigned to the AC.
+            cg.assign_to_ac(rtn_var);
+
+            // Do integer division.
+            cg.emit_math(DIV, AC_REG, lhs_reg, rhs_reg, "BINARY DIVISION INT OP");
+
+            if (tmDebugFlag)
+            {
+                cg.emit_note("------- END INT DIVISION ---------");
+            }
         }
         else {
             // TYPE ERROR!
@@ -1455,11 +1524,39 @@ exp:
             VarRec *rtn_var = new VarRec("mod_return", $<var_rec>1->get_type());
 
             // Do integer modulus.
-            // TODO: EMIT INTEGER MODULUS CODE HERE.
-            // TODO: EMIT INTEGER MODULUS CODE HERE.
-            // TODO: EMIT INTEGER MODULUS CODE HERE.
             $$ = rtn_var;
-            //$$ = $<type_rec>1;
+
+            // CODE GEN
+            // CODE GEN
+            // CODE GEN
+            if (tmDebugFlag)
+            {
+                cg.emit_note("------- BEGIN INT MOD ---------");
+            }
+
+            // Get the rhs and lhs register assignments.
+            int lhs_reg = cg.get_reg_assign($<var_rec>1);
+            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+
+            // Assign the return value to the accumulator.
+            // Must check this after getting the rhs and lhs assignments because
+            // one of them may have been assigned to the AC.
+            cg.assign_to_ac(rtn_var);
+
+            // Do integer MOD.
+            // 1. Do division with same values and save value.
+            // 2. Multiply denominator by #1 result.
+            // 3. Subtract #2 result from numerator.
+            cg.emit_math(DIV, AC_REG, lhs_reg, rhs_reg, "MOD OP - Step 1 Do div.");
+            cg.emit_math(MUL, AC_REG, AC_REG, rhs_reg, 
+                "MOD OP - Step 2 Mul #1xDenom");
+            cg.emit_math(SUB, AC_REG, lhs_reg, AC_REG, 
+                "MOD OP - Step 3 Sub #2 from numerator.");
+
+            if (tmDebugFlag)
+            {
+                cg.emit_note("------- END INT MOD ---------");
+            }
         }
         else {
             // TYPE ERROR!
@@ -1473,11 +1570,45 @@ exp:
             // Equal comparison always returns boolean type.
             VarRec *rtn_var = new VarRec("EQ_return", sm->lookup_type("bool"));
 
-            // TODO: PERFORM COMPARISON OP ON EXPs.
-            // TODO: PERFORM COMPARISON OP ON EXPs.
-            // TODO: PERFORM COMPARISON OP ON EXPs.
             $$ = rtn_var;
-            //$$ = sm->lookup_type("bool");
+
+
+            // CODE GEN
+            // CODE GEN
+            // CODE GEN
+            int lhs_reg = cg.get_reg_assign($<var_rec>1);
+            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+
+            // Assign the return value to the accumulator.
+            // Must check this after getting the rhs and lhs assignments because
+            // one of them may have been assigned to the AC.
+            cg.assign_to_ac(rtn_var);
+
+            if (tmDebugFlag)
+            {
+                cg.emit_note("------- BEGIN INT/BOOL EQUAL (==) ---------");
+            }
+
+            cg.emit_math(SUB, AC_REG, lhs_reg, rhs_reg, "SUB to check equality.");
+
+            // If difference != 0 skip "then".
+            cg.emit_jump(JNE, AC_REG, 2, PC_REG,
+                "If difference != 0 skip next 2 lines.");
+
+            // "Then" values are same set return to 1.
+            cg.emit_load_value(AC_REG, 1, ZERO_REG, "Set return val to true 1.");
+
+            // Skip the "else" stmt.
+            cg.emit_jump(JEQ, ZERO_REG, 1, PC_REG, 
+                "Unconditional jump - skip else");
+
+            // "Else" values are different set return to 0.
+            cg.emit_load_value(AC_REG, 0, ZERO_REG, "Set return val to false 0.");
+
+            if (tmDebugFlag)
+            {
+                cg.emit_note("------- END INT/BOOL EQUAL (==) ---------");
+            }
         }
         else {
             // TYPE ERROR!
@@ -1491,11 +1622,45 @@ exp:
             // Not equal comparison always returns boolean type.
             VarRec *rtn_var = new VarRec("NEQ_return", sm->lookup_type("bool"));
 
-            // TODO: PERFORM NOT EQUAL OP ON EXPs.
-            // TODO: PERFORM NOT EQUAL OP ON EXPs.
-            // TODO: PERFORM NOT EQUAL OP ON EXPs.
             $$ = rtn_var;
-            //$$ = sm->lookup_type("bool");
+
+
+            // CODE GEN
+            // CODE GEN
+            // CODE GEN
+            int lhs_reg = cg.get_reg_assign($<var_rec>1);
+            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+
+            // Assign the return value to the accumulator.
+            // Must check this after getting the rhs and lhs assignments because
+            // one of them may have been assigned to the AC.
+            cg.assign_to_ac(rtn_var);
+
+            if (tmDebugFlag)
+            {
+                cg.emit_note("------- BEGIN INT/BOOL NOT EQUAL (==) ---------");
+            }
+
+            cg.emit_math(SUB, AC_REG, lhs_reg, rhs_reg, "SUB to check not equal.");
+
+            // If difference == 0 skip "then".
+            cg.emit_jump(JEQ, AC_REG, 2, PC_REG,
+                "If difference == 0 skip next 2 lines.");
+
+            // "Then" values are same set return to 1.
+            cg.emit_load_value(AC_REG, 1, ZERO_REG, "Set return val to true 1.");
+
+            // Skip the "else" stmt.
+            cg.emit_jump(JEQ, ZERO_REG, 1, PC_REG, 
+                "Unconditional jump - skip else");
+
+            // "Else" values are different set return to 0.
+            cg.emit_load_value(AC_REG, 0, ZERO_REG, "Set return val to false 0.");
+
+            if (tmDebugFlag)
+            {
+                cg.emit_note("------- END INT/BOOL NOT EQUAL (==) ---------");
+            }
         }
         else {
             // TYPE ERROR!
@@ -1509,11 +1674,45 @@ exp:
             // Greater than comparison always returns boolean type.
             VarRec *rtn_var = new VarRec("GT_return", sm->lookup_type("bool"));
 
-            // TODO: PERFORM GREATER THAN OP ON EXPs.
-            // TODO: PERFORM GREATER THAN OP ON EXPs.
-            // TODO: PERFORM GREATER THAN OP ON EXPs.
             $$ = rtn_var;
-            //$$ = sm->lookup_type("bool");
+
+
+            // CODE GEN
+            // CODE GEN
+            // CODE GEN
+            int lhs_reg = cg.get_reg_assign($<var_rec>1);
+            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+
+            // Assign the return value to the accumulator.
+            // Must check this after getting the rhs and lhs assignments because
+            // one of them may have been assigned to the AC.
+            cg.assign_to_ac(rtn_var);
+
+            if (tmDebugFlag)
+            {
+                cg.emit_note("------- BEGIN INT GREATER THAN (==) ---------");
+            }
+
+            cg.emit_math(SUB, AC_REG, lhs_reg, rhs_reg, "SUB to check greater than.");
+
+            // If difference > 0 skip "then".
+            cg.emit_jump(JGT, AC_REG, 2, PC_REG,
+                "If difference > 0 skip next 2 lines.");
+
+            // "Then" lhs <= rhs set return to 0.
+            cg.emit_load_value(AC_REG, 0, ZERO_REG, "Set return val to false 0.");
+
+            // Skip the "else" stmt.
+            cg.emit_jump(JEQ, ZERO_REG, 1, PC_REG, 
+                "Unconditional jump - skip else");
+
+            // "Else" lhs > rhs set return to 1.
+            cg.emit_load_value(AC_REG, 1, ZERO_REG, "Set return val to true 1.");
+
+            if (tmDebugFlag)
+            {
+                cg.emit_note("------- END INT GREATER THAN (==) ---------");
+            }
         }
         else {
             // TYPE ERROR!
@@ -1527,11 +1726,45 @@ exp:
             // Less than comparison always returns boolean type.
             VarRec *rtn_var = new VarRec("LT_return", sm->lookup_type("bool"));
 
-            // TODO: PERFORM LESS THAN OP ON EXPs.
-            // TODO: PERFORM LESS THAN OP ON EXPs.
-            // TODO: PERFORM LESS THAN OP ON EXPs.
             $$ = rtn_var;
-            //$$ = sm->lookup_type("bool");
+
+
+            // CODE GEN
+            // CODE GEN
+            // CODE GEN
+            int lhs_reg = cg.get_reg_assign($<var_rec>1);
+            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+
+            // Assign the return value to the accumulator.
+            // Must check this after getting the rhs and lhs assignments because
+            // one of them may have been assigned to the AC.
+            cg.assign_to_ac(rtn_var);
+
+            if (tmDebugFlag)
+            {
+                cg.emit_note("------- BEGIN INT LESS THAN (==) ---------");
+            }
+
+            cg.emit_math(SUB, AC_REG, lhs_reg, rhs_reg, "SUB to check less than.");
+
+            // If difference < 0 skip "then".
+            cg.emit_jump(JLT, AC_REG, 2, PC_REG,
+                "If difference < 0 skip next 2 lines.");
+
+            // "Then" lhs >= rhs set return to 0.
+            cg.emit_load_value(AC_REG, 0, ZERO_REG, "Set return val to false 0.");
+
+            // Skip the "else" stmt.
+            cg.emit_jump(JEQ, ZERO_REG, 1, PC_REG, 
+                "Unconditional jump - skip else");
+
+            // "Else" lhs > rhs set return to 1.
+            cg.emit_load_value(AC_REG, 1, ZERO_REG, "Set return val to true 1.");
+
+            if (tmDebugFlag)
+            {
+                cg.emit_note("------- END INT LESS THAN (==) ---------");
+            }
         }
         else {
             // TYPE ERROR!
@@ -1545,11 +1778,45 @@ exp:
             // Greater than equal comparison always returns boolean type.
             VarRec *rtn_var = new VarRec("GE_return", sm->lookup_type("bool"));
 
-            // TODO: PERFORM GREATER THAN OR EQUAL OP ON EXPs.
-            // TODO: PERFORM GREATER THAN OR EQUAL OP ON EXPs.
-            // TODO: PERFORM GREATER THAN OR EQUAL OP ON EXPs.
             $$ = rtn_var;
-            //$$ = sm->lookup_type("bool");
+
+
+            // CODE GEN
+            // CODE GEN
+            // CODE GEN
+            int lhs_reg = cg.get_reg_assign($<var_rec>1);
+            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+
+            // Assign the return value to the accumulator.
+            // Must check this after getting the rhs and lhs assignments because
+            // one of them may have been assigned to the AC.
+            cg.assign_to_ac(rtn_var);
+
+            if (tmDebugFlag)
+            {
+                cg.emit_note("------- BEGIN INT GREATER THAN (==) ---------");
+            }
+
+            cg.emit_math(SUB, AC_REG, lhs_reg, rhs_reg, "SUB to check greater than.");
+
+            // If difference >= 0 skip "then".
+            cg.emit_jump(JGE, AC_REG, 2, PC_REG,
+                "If difference >= 0 skip next 2 lines.");
+
+            // "Then" lhs < rhs set return to 0.
+            cg.emit_load_value(AC_REG, 0, ZERO_REG, "Set return val to false 0.");
+
+            // Skip the "else" stmt.
+            cg.emit_jump(JEQ, ZERO_REG, 1, PC_REG, 
+                "Unconditional jump - skip else");
+
+            // "Else" lhs > rhs set return to 1.
+            cg.emit_load_value(AC_REG, 1, ZERO_REG, "Set return val to true 1.");
+
+            if (tmDebugFlag)
+            {
+                cg.emit_note("------- END INT GREATER THAN (==) ---------");
+            }
         }
         else {
             // TYPE ERROR!
@@ -1563,11 +1830,45 @@ exp:
             // Less than or equal comparison always returns boolean type.
             VarRec *rtn_var = new VarRec("LE_return", sm->lookup_type("bool"));
 
-            // TODO: PERFORM LESS THAN OR EQUAL OP ON EXPs.
-            // TODO: PERFORM LESS THAN OR EQUAL OP ON EXPs.
-            // TODO: PERFORM LESS THAN OR EQUAL OP ON EXPs.
             $$ = rtn_var;
-            //$$ = sm->lookup_type("bool");
+
+
+            // CODE GEN
+            // CODE GEN
+            // CODE GEN
+            int lhs_reg = cg.get_reg_assign($<var_rec>1);
+            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+
+            // Assign the return value to the accumulator.
+            // Must check this after getting the rhs and lhs assignments because
+            // one of them may have been assigned to the AC.
+            cg.assign_to_ac(rtn_var);
+
+            if (tmDebugFlag)
+            {
+                cg.emit_note("------- BEGIN INT LESS THAN (==) ---------");
+            }
+
+            cg.emit_math(SUB, AC_REG, lhs_reg, rhs_reg, "SUB to check less than.");
+
+            // If difference <= 0 skip "then".
+            cg.emit_jump(JLE, AC_REG, 2, PC_REG,
+                "If difference <= 0 skip next 2 lines.");
+
+            // "Then" lhs > rhs set return to 0.
+            cg.emit_load_value(AC_REG, 0, ZERO_REG, "Set return val to false 0.");
+
+            // Skip the "else" stmt.
+            cg.emit_jump(JEQ, ZERO_REG, 1, PC_REG, 
+                "Unconditional jump - skip else");
+
+            // "Else" lhs > rhs set return to 1.
+            cg.emit_load_value(AC_REG, 1, ZERO_REG, "Set return val to true 1.");
+
+            if (tmDebugFlag)
+            {
+                cg.emit_note("------- END INT LESS THAN (==) ---------");
+            }
         }
         else {
             // TYPE ERROR!
@@ -1577,6 +1878,8 @@ exp:
     }
    | TK_LPAREN exp TK_RPAREN    
     { 
+        // TODO: This signifies an immediate evaluation of all exps within these
+        //      parens.
         $$ = $<var_rec>2; 
     }
    ;
