@@ -21,7 +21,7 @@ class VarRec {
         // Type of this varaible.
         TypeRec *_var_type;
 
-        // Location in memory.
+        // Relative Location in memory.
         int _memory_loc;
 
         // Flag indicating if variable is used as a loop counter.

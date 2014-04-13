@@ -29,8 +29,12 @@ CodeGenerator::CodeGenerator()
         _reg_assign[index] = 0;
     }
 
+    // TODO: GET RID OF THE REG ASSIGNMENT STUFF. ALWAYS SPILL.
     // Don't use register 0.
     _next_assignment = 1;
+
+    // Set the initial variable offset for globals.
+    _offset_stack.push(INIT_VAR_OFFSET);
 }
 
 

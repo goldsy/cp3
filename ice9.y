@@ -863,13 +863,15 @@ if:
         yyerror(errorMsg.c_str());
         exit(0);
     }
+
+    // TODO: EMIT IF STMT HERE.
   }
   ;
 
 if2:
    /* empty rule */
    | if2 TK_BOX exp TK_ARROW stms
-      {
+    {
         // exp must be a bool.
         TypeRec *bool_rec = sm->lookup_type("bool");
 
@@ -881,7 +883,9 @@ if2:
             yyerror(errorMsg.c_str());
             exit(0);
         }
-      }
+
+        // TODO: EMIT ELSE-IF STMT HERE.
+    }
    ;
 
 if4:
