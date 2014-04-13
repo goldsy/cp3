@@ -1135,20 +1135,37 @@ exp:
     { 
         // TODO: THE READ PULLS AN INT THAT THE USER ENTERS.  FIGURE THIS ONE OUT.
         //      FOR NOW JUST RETURN A KNOWN VALUE THAT CAN BE TESTED.
-        //      ??? RUNTIME CHECK FOR INT ???
+        //      ??? RUNTIME CHECK FOR INT OR SIZE ???
         TypeRec *target_type = sm->lookup_type("int");
         //      FOR NOW JUST RETURN A KNOWN VALUE THAT CAN BE TESTED.
         //      FOR NOW JUST RETURN A KNOWN VALUE THAT CAN BE TESTED.
         //      FOR NOW JUST RETURN A KNOWN VALUE THAT CAN BE TESTED.
-        $$ = new VarRec("@int_literal", target_type, true, "0");
+        $$ = new VarRec("@int_user_lit", target_type, true, "0");
 
 
         // CODE GEN
         // CODE GEN
         // CODE GEN
+        // This will get the correct memory offset and keep the data call in sync.
+        // Must be before the IN because they both use the IMMED_REG.
+        $$->set_memory_loc(cg.emit_init_int(0, 
+            "Storing bogus literal for READ value."));
+
         // Emit an IN and get a register to store it in.
-        int rhs_reg = cg.get_reg_assign($$);
-        cg.emit_io(IN, rhs_reg, "Read int from user.");
+        //int rhs_reg = cg.get_reg_assign($$);
+        //cg.emit_io(IN, rhs_reg, "Read int from user.");
+        cg.emit_io(IN, IMMED_REG, "Read int from user.");
+
+        if (in_proc_defn_flag)
+        {
+            cg.emit_store_mem(IMMED_REG, $$->get_memory_loc(), FP_REG,
+                "Storing immediate int to frame memory from user input.");
+        }
+        else
+        {
+            cg.emit_store_mem(IMMED_REG, $$->get_memory_loc(), ZERO_REG,
+                "Storing immediate int to global memory from user input.");
+        }
     }
    | TK_MINUS exp  
     {

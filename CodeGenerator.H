@@ -18,12 +18,14 @@ const string NOTE_PADDING = "\t\t\t";
 
 // The register that will always contain the 0 value.
 const int ZERO_REG = 0;
-const int AC_REG = 5; /* TODO: NOT SURE IF THIS IS NEEDED YET. */
-const int STACK_REG = 6; /* TODO: NOT SURE IF THIS IS NEEDED YET. */
-const int PC_REG = 7;
+const int IMMED_REG = 4; /* Immediate register */
+const int AC_REG = 5; /* Accumulator register */
+const int FP_REG = 6; /* Frame Pointer register */
+const int PC_REG = 7; /* Program Counter register */
+
 
 // All variable offsets start at one.
-const int INIT_VAR_OFFSET = 1;
+const int INIT_FRAME_OFFSET = 1;
 
 
 // Put all TM op codes in the same enum to ensure that numbers won't be reused
@@ -102,7 +104,8 @@ class CodeGenerator {
 
         // The stack will be used to keep track of the next available offset 
         // for the variables in either the global or within a proc.
-        stack<int> _offset_stack;
+        //stack<int> _offset_stack;
+        int _next_frame_offset;
 
 
     public:

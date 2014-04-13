@@ -8,6 +8,10 @@
 using namespace std;
 
 
+// Defined in the bison file.
+extern bool in_proc_defn_flag;
+
+
 // Class ctor
 CodeGenerator::CodeGenerator()
 {
@@ -16,11 +20,12 @@ CodeGenerator::CodeGenerator()
     // Zero is reserved for the size of data.
     _next_data_addr = 1;
 
-    // Sized to 5 because I want reg 0 as my 0 value register
-    // and this will make sure indexes 1-4 align with register
-    // numbers 1-4. Index zero will never be used.
+    // Sized to 6 because I want reg 0 as my 0 value register
+    // and this will make sure indexes 1-3 align with register
+    // numbers 1-3. Index zero will never be used.
+    // Reg 4 - Reserve for storing immediates to memory.
     // Reg 5 - Accumulator
-    // Reg 6 - Stack Ptr
+    // Reg 6 - Stack Ptr / Frame Ptr
     // Reg 7 - PC
     _reg_assign.resize(6);
 
@@ -34,7 +39,8 @@ CodeGenerator::CodeGenerator()
     _next_assignment = 1;
 
     // Set the initial variable offset for globals.
-    _offset_stack.push(INIT_VAR_OFFSET);
+    //_offset_stack.push(INIT_FRAME_OFFSET);
+    _next_frame_offset = INIT_FRAME_OFFSET;
 }
 
 
@@ -85,16 +91,46 @@ void CodeGenerator::init_out_file(char *target_filename)
 // Precondition: The out file must be open for writing.
 int CodeGenerator::emit_init_int(int data, string note)
 {
-    // Store the target data address. This is logical because TM does this for us.
-    int target_addr = _next_data_addr;
+    //// Store the target data address. This is logical because TM does this for us.
+    //int target_addr = _next_data_addr;
 
-    //
-    ++_next_data_addr;
+    ////
+    //++_next_data_addr;
 
-    _output_file << ".DATA " << data << NOTE_PADDING << note;
-    _output_file << " [" << fmt_int(target_addr) << "]" << endl;
+    //_output_file << ".DATA " << data << NOTE_PADDING << note;
+    //_output_file << " [" << fmt_int(target_addr) << "]" << endl;
 
-    return target_addr;
+    //return target_addr;
+
+    int target_addr_offset;
+
+    if (in_proc_defn_flag)
+    {
+        // We're in a procedure, advancing through a frame.
+        target_addr_offset = _next_frame_offset;
+        ++_next_frame_offset;
+
+        emit_load_immed(IMMED_REG, data, "Loading immediate to store in frame mem.");
+
+        // Store the memory location defined by the offset and
+        // the current frame pointer value.
+        emit_store_mem(IMMED_REG, target_addr_offset, FP_REG, 
+                "Storing immediate to frame memory.");
+    }
+    else
+    {
+        // Store the target data address. This is logical because TM does this for us.
+        target_addr_offset = _next_data_addr;
+
+        // Advance the global address.
+        ++_next_data_addr;
+
+        _output_file << ".DATA " << data << NOTE_PADDING << note;
+    }
+
+    _output_file << " [" << fmt_int(target_addr_offset) << "]" << endl;
+
+    return target_addr_offset;
 }
 
 
@@ -103,6 +139,7 @@ int CodeGenerator::emit_init_int(int data, string note)
 // Precondition: The out file must be open for writing.
 int CodeGenerator::emit_init_str(string data, string note)
 {
+    // TODO: DO SOMETHING LIKE THE INT INIT ABOVE.
     // Store the target data address. This is logical because TM does this for us.
     int target_addr = _next_data_addr;
 
@@ -462,9 +499,9 @@ void CodeGenerator::advance_next_assignment()
 {
     ++_next_assignment;
 
-    // This reserves first and last register numbers, but has then in the
+    // This reserves first one and last two register numbers, but stores them in the
     // vector.
-    if (static_cast<unsigned int>(_next_assignment) > (_reg_assign.size() - 2))
+    if (static_cast<unsigned int>(_next_assignment) > (_reg_assign.size() - 3))
     {
         // Turn the corner.
         _next_assignment = 1;
