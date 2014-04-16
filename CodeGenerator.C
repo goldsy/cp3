@@ -79,6 +79,13 @@ string CodeGenerator::get_fmt_line(int line_num)
 }
 
 
+// Skips over some lines so we can back patch later.
+void CodeGenerator::reserve_lines(int num_lines)
+{
+    _curr_line_num += num_lines;
+}
+
+
 // This method initializes the outfile.
 void CodeGenerator::init_out_file(char *target_filename)
 {
@@ -126,9 +133,8 @@ int CodeGenerator::emit_init_int(int data, string note)
         ++_next_data_addr;
 
         _output_file << ".DATA " << data << NOTE_PADDING << note;
+        _output_file << " [" << fmt_int(target_addr_offset) << "]" << endl;
     }
-
-    _output_file << " [" << fmt_int(target_addr_offset) << "]" << endl;
 
     return target_addr_offset;
 }

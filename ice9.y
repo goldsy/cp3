@@ -5,6 +5,7 @@
 #include <string>
 #include <list>
 #include <iostream>
+#include <deque>
 
 #include "ScopeMgr.H"
 #include "TypeRec.H"
@@ -55,6 +56,16 @@ list<string> *id_list = 0;
 string proc_name;
 TypeRec *proc_type = 0;
 list<VarRec *> *proc_var_rec_list = 0;
+
+// Stucture for back patching if statements.
+typedef struct BkPatch {
+    int test_reg_num;
+    int line_num;
+    string note;
+} BkPatch;
+
+deque<BkPatch> if_jump_next_q;
+deque<BkPatch> if_jump_end_q;
 
 
 %}
@@ -145,16 +156,28 @@ list<VarRec *> *proc_var_rec_list = 0;
 %type <var_rec_list> declistx
 %type <var_rec_list> declistx2
 %type <type_rec> proc2
+%type <intt> qjumpnext
+%type <intt> elseif
+%type <intt> elseifentry
+%type <intt> ifend
 %%
 
 /* START */
 program:
-       defs stms0 
+       proginit defs stms0 
         { 
             /* printf("%s\n", sm->knock_knock().c_str()); */ 
             cg.emit(HALT, "END OF PROGRAM"); 
         }
     ;
+
+proginit:
+        /* empty rule */
+        {
+            // Initialize the FP to point to the end of memory.
+            cg.emit_load_mem(FP_REG, 0, ZERO_REG, "Initialize the FP to end of mem.");
+        }
+        ;
 
 
 /* *********************** */
@@ -229,7 +252,32 @@ varlist:
                 // CODE GEN
                 // CODE GEN
                 // CODE GEN
-                if (is_int_or_boolean(target_type))
+                if (target_type->is_array())
+                {
+                    // USE MEMORY LAYOUT of:
+                    // # Dimensions
+                    // 1 .. n Dimension Size
+                    // These will be used for overrun checks.
+
+                    // NOTE THAT THIS NEEDS TO BE DONE FOR INT/BOOL AND STRING.
+                    if (is_int_or_boolean(target_type->get_primitive()))
+                    {
+                        // Interger and boolean case
+                        // TODO: FINISH INT/BOOL ARRAY ALLOCATION.
+                        // TODO: FINISH INT/BOOL ARRAY ALLOCATION.
+                        // TODO: FINISH INT/BOOL ARRAY ALLOCATION.
+                        cg.emit_note("TODO: INT/BOOL ARRAY ALLOCATION");
+                    }
+                    else
+                    {
+                        // String case
+                        // TODO: FINISH STRING ARRAY ALLOCATION.
+                        // TODO: FINISH STRING ARRAY ALLOCATION.
+                        // TODO: FINISH STRING ARRAY ALLOCATION.
+                        cg.emit_note("TODO: STRING ARRAY ALLOCATION");
+                    }
+                }
+                else if (is_int_or_boolean(target_type))
                 {
                     // Init space for the bool or int.
                     // Store the memory loc in the var. Init it to 0.
@@ -692,9 +740,9 @@ stm:
     }
    | TK_RETURN TK_SEMI
     {
-        // TODO: ADD MACHINE CODE TO RETURN FROM FUNCTION.
-        // TODO: ADD MACHINE CODE TO RETURN FROM FUNCTION.
-        // TODO: ADD MACHINE CODE TO RETURN FROM FUNCTION.
+        // TODO: ADD MACHINE CODE TO JUMP TO END OF FUNCTION THEN RETURN FROM FUNCTION.
+        // TODO: ADD MACHINE CODE TO JUMP TO END OF FUNCTION THEN RETURN FROM FUNCTION.
+        // TODO: ADD MACHINE CODE TO JUMP TO END OF FUNCTION THEN RETURN FROM FUNCTION.
     }
    | lvalue TK_ASSIGN exp TK_SEMI
     {
@@ -744,6 +792,16 @@ stm:
             // Load exp into register if necessary.
             int lhs_reg = cg.get_reg_assign($<var_rec>1);
             int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+            // This is stupid but the round robin thing is screwing me.
+            // This fixes my assignment problem because I always have 3
+            // registers to use.
+            // THIS DOESN"T WORK EITHER.
+            // THIS DOESN"T WORK EITHER.
+            // THIS DOESN"T WORK EITHER.
+            // THIS DOESN"T WORK EITHER.
+            // THIS DOESN"T WORK EITHER.
+            // TODO: FIX THE REGISTER ASSIGNMENT STUFF.
+            lhs_reg = cg.get_reg_assign($<var_rec>1);
 
             cg.emit_load_value(lhs_reg, 0, rhs_reg, "Assignment of " +
                 $<var_rec>3->get_name() + " to " + $<var_rec>1->get_name());
@@ -752,6 +810,7 @@ stm:
         {
             // Otherwise we are dealing with a string.
             // TODO: FINISH EMIT STRING ASSIGNMENT.
+            cg.emit_note("TODO: FINISH EMIT STRING ASSIGNMENT.");
         }
 
         if (tmDebugFlag)
@@ -850,8 +909,15 @@ stm:
    ;
 
 if:
-  TK_IF exp TK_ARROW stms if2 if4
+  TK_IF exp qjumpnext TK_ARROW stms qjumpend elseif ifend
   {
+    // DEBUG
+    if (debugFlag)
+    {
+        printf("IF JUMP NEXT LINE NUM %d\n", $<intt>3);
+        printf("LINE NUM AT END OF COMPLETE IF STMT %d\n", $<intt>8);
+    }
+
     // exp must be a bool.
     TypeRec *bool_rec = sm->lookup_type("bool");
 
@@ -864,18 +930,72 @@ if:
         exit(0);
     }
 
-    // TODO: EMIT IF STMT HERE.
+    // All code emitted in sub-rules.
   }
   ;
 
-if2:
-   /* empty rule */
-   | if2 TK_BOX exp TK_ARROW stms
+qjumpnext:
+    /* empty rule */
+    {
+        // Reserve instructions for if test.
+        if (tmDebugFlag)
+        {
+            cg.emit_note("RESERVE LINE " + fmt_int(cg.get_curr_line()) + 
+                " FOR JUMP TO NEXT IF BLOCK.");
+        }
+
+        $$ = cg.get_curr_line();
+        cg.reserve_lines(1);
+
+        // Queue the jump to elseif or else block.
+        BkPatch ifjump;
+
+        ifjump.test_reg_num = cg.get_reg_assign($<var_rec>0);
+        ifjump.line_num = $$;
+        ifjump.note = "Jump from if stmt to elseif, else or ifend.";
+
+        if_jump_next_q.push_back(ifjump);
+    }
+    ;
+
+qjumpend:
+    /* empty rule */
+    {
+        // TODO: MOVE THIS TO A FUNCTION!!!
+        // This rule is used to queue backpatches for jumping to the end
+        // of the if stmt block.
+        if (tmDebugFlag)
+        {
+            cg.emit_note("RESERVE LINE " + fmt_int(cg.get_curr_line()) + 
+                " FOR JUMP TO END OF IF BLOCK.");
+        }
+
+        BkPatch jump_to_end;
+
+        // This is an absolute jump so the test register is irrelevant.
+        jump_to_end.test_reg_num = ZERO_REG;
+        jump_to_end.line_num = cg.get_curr_line();
+        jump_to_end.note = "Jump from if or elseif to end of if block.";
+
+        if_jump_end_q.push_back(jump_to_end);
+
+        cg.reserve_lines(1);
+    }
+    ;
+
+elseif:
+    /* empty rule */
+    {
+        // Always return zero to indicate no instructions.
+        printf("ELSEIF EMPTY LINE %d\n", cg.get_curr_line());
+        $$ = 0;
+    }
+   | elseif TK_BOX dqifjumpnext exp qjumpnext elseifentry TK_ARROW stms qjumpend
     {
         // exp must be a bool.
         TypeRec *bool_rec = sm->lookup_type("bool");
 
-        if (!bool_rec->equal($<var_rec>3->get_type()))
+        if (!bool_rec->equal($<var_rec>4->get_type()))
         {
             // Type is not boolean.
             string errorMsg;
@@ -884,14 +1004,140 @@ if2:
             exit(0);
         }
 
+        // CODE GEN
+        // CODE GEN
+        // CODE GEN
         // TODO: EMIT ELSE-IF STMT HERE.
+        // TODO: EMIT ELSE-IF STMT HERE.
+        // TODO: EMIT ELSE-IF STMT HERE.
+        $$ = cg.get_curr_line();
+        printf("ELSEIF NESTED %d\n", $<intt>1);
+
+
+
+
+        //if (tmDebugFlag)
+        //{
+        //    cg.emit_note("RESERVE LINE " + fmt_int(cg.get_curr_line()) + 
+        //        " FOR JUMP TO END OF IF BLOCK.");
+        //}
+
+        //BkPatch jump_to_end;
+
+        //// This is an absolute jump so the test register is irrelevant.
+        //jump_to_end.test_reg_num = ZERO_REG;
+        //jump_to_end.line_num = cg.get_curr_line();
+        //jump_to_end.note = "Jump from if or elseif to end of if block.";
+
+        //if_jump_end_q.push_back(jump_to_end);
+
+        //cg.reserve_lines(1);
     }
    ;
 
-if4:
-   TK_FI
-   | TK_BOX TK_ELSE TK_ARROW stms TK_FI
+dqifjumpnext:
+        /* empty rule */
+    {
+        // Process the jump next queue. I know I call it a queue and treat it
+        // like a stack but the order doesn't matter.
+        if (if_jump_next_q.size() > 0)
+        {
+            if (tmDebugFlag && (if_jump_next_q.size() > 1))
+            {
+                cg.emit_note("HEY JUMP NEXT QUEUE HAS SIZE " + 
+                    fmt_int(if_jump_next_q.size()));
+            }
+
+            // Get the item (Really should only ever be one).
+            BkPatch patch = if_jump_next_q.back();
+
+            cg.emit_jump(JEQ, patch.test_reg_num, (cg.get_curr_line() - 
+                patch.line_num), PC_REG, patch.note, patch.line_num);
+
+            // Remove the item.
+            if_jump_next_q.pop_back();
+        }
+    }
+    ;
+
+elseifentry:
+        /* empty rule */
+    {
+        // TODO: REMOVE AFTER TESTING.
+        // Reserve instructions for if test.
+//        if (tmDebugFlag)
+//        {
+//            cg.emit_note("RESERVE LINE " + fmt_int(cg.get_curr_line()) + 
+//                " FOR IF TEST.");
+//        }
+//
+        $$ = cg.get_curr_line();
+//        cg.reserve_lines(1);
+//
+//        // Queue the jump to elseif or else block.
+//        BkPatch ifjump;
+//
+//        ifjump.test_reg_num = cg.get_reg_assign($<var_rec>0);
+//        ifjump.line_num = $$;
+//        ifjump.note = "Jump from elseif stmt to elseif, else or end.";
+//
+//        if_jump_next_q.push_back(ifjump);
+    }
+    ;
+
+ifend:
+   dqifjumpnext TK_FI
+    {
+        // No else statement so clear the jump next queue because the
+        // preceding if or else if doesn't need to jump.
+        // Return current line which is end of if stmt.
+        $$ = cg.get_curr_line();
+
+        // CODE GEN
+        // CODE GEN
+        // CODE GEN
+        while (if_jump_end_q.size() > 0)
+        {
+            // Get the item (Really should only ever be one).
+            BkPatch patch = if_jump_end_q.back();
+
+            cg.emit_jump(JEQ, patch.test_reg_num, (cg.get_curr_line() - 
+                patch.line_num), PC_REG, patch.note, patch.line_num);
+
+            // Remove the item.
+            if_jump_end_q.pop_back();
+        }
+    }
+   | TK_BOX TK_ELSE TK_ARROW dqifjumpnext ifendentry stms TK_FI
+    {
+        // Return current line which is end of if stmt.
+        $$ = cg.get_curr_line();
+
+        // CODE GEN
+        // CODE GEN
+        // CODE GEN
+        // Back patch the end for every jump to end.
+        while (if_jump_end_q.size() > 0)
+        {
+            // Get the item (Really should only ever be one).
+            BkPatch patch = if_jump_end_q.back();
+
+            cg.emit_jump(JEQ, patch.test_reg_num, (cg.get_curr_line() - 
+                patch.line_num), PC_REG, patch.note, patch.line_num);
+
+            // Remove the item.
+            if_jump_end_q.pop_back();
+        }
+    }
    ;
+
+ifendentry:
+        /* empty rule */
+    {
+        // TODO: REMOVE AFTER TESTING.
+        //$$ = cg.get_curr_line();
+    }
+    ;
 
 do:
   TK_DO doentry exp TK_ARROW stms0 TK_OD

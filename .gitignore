@@ -28,6 +28,7 @@ tags
 
 # ice9 source files
 *.9
+*.out
 
 # Tiny Machine executable and tm machine files.
 tm

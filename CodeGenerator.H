@@ -121,6 +121,9 @@ class CodeGenerator {
         // Get the current output line number formatted for TM output.
         string get_fmt_curr_line();
 
+        // Skips over some lines so we can back patch later.
+        void reserve_lines(int num_lines);
+
         // Initializes the output file.
         void init_out_file(char *target_filename);
 
