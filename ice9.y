@@ -734,10 +734,32 @@ stm:
             exit(0);
         }
 
-        // TODO: ADD MACHINE CODE TO RETURN FROM FA OR DO.
-        // TODO: ADD MACHINE CODE TO RETURN FROM FA OR DO.
-        // TODO: ADD MACHINE CODE TO RETURN FROM FA OR DO.
+        // CODE GEN
+        // CODE GEN
+        // CODE GEN
         // BACK PATCH JUMP OVER END OF LOOP.
+        if (tmDebugFlag)
+        {
+            cg.emit_note("Reserve line " + fmt_int(cg.get_curr_line()) + 
+                " for BREAK - Unconditional jump to end of DO/FA block.");
+        }
+
+        BkPatch jump_to_end;
+
+        // Get the test register for the exp variable.
+        jump_to_end.test_reg_num = ZERO_REG;
+        jump_to_end.line_num = cg.get_curr_line();
+        jump_to_end.note = "Jump from 'break' to end of do/fa block.";
+
+        dofa_jump_end_stack.top().push_back(jump_to_end);
+
+        cg.reserve_lines(1);
+
+        if (debugFlag)
+        {
+            printf("END OF TK_BREAK\n");
+            fflush(0);
+        }
     }
    | TK_EXIT TK_SEMI
     {
