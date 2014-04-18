@@ -18,6 +18,8 @@ const string NOTE_PADDING = "\t\t\t";
 
 // The register that will always contain the 0 value.
 const int ZERO_REG = 0;
+const int LHS_REG = 1; /* LHS register */
+const int RHS_REG = 2; /* RHS register */
 const int IMMED_REG = 4; /* Immediate register */
 const int AC_REG = 5; /* Accumulator register */
 const int FP_REG = 6; /* Frame Pointer register */
@@ -89,18 +91,7 @@ class CodeGenerator {
 
 
         // Vector of VarRec ptrs for register assignment and spilling.
-        vector<VarRec *> _reg_assign;
-
-        // This variable indicates the next register to be used to
-        // load a value into. It will round robin with the hope that
-        // the last loaded value will be the most likely to be no longer
-        // live. The a register's number comes up it will be inspected to
-        // see if it has a pointer and if so it will spill and the newly
-        // loaded variable will take the spilled ones place.
-        int _next_assignment;
-
-        // Function to implement the round robin register assignment.
-        void advance_next_assignment();
+        stack<vector<pair<VarRec *, int> > > _reg_assign;
 
         // The stack will be used to keep track of the next available offset 
         // for the variables in either the global or within a proc.
@@ -127,14 +118,15 @@ class CodeGenerator {
         // Initializes the output file.
         void init_out_file(char *target_filename);
 
+        // TODO: NEVER DEFINED. REMOVE AFTER TESTING.
+        // Gets the addrs of the next available data location.
+        //int get_next_data_addr();
+
         // Emits the store int data instruction.
         int emit_init_int(int data, string note);
 
         // Emits the store string data instruction.
         int emit_init_str(string data, string note);
-
-        // Gets the addrs of the next available data location.
-        int get_next_data_addr();
 
 
         // This emit is used for no register/value operations.
@@ -170,15 +162,22 @@ class CodeGenerator {
         void error(TmOp code, string funct);
 
 
-        // Determines if the specified variable is already loaded into a register.
-        int is_loaded(VarRec *source);
+        // This function assigns the specified variable to the left register.
+        // There is a check if the variable is assigne to the accumulator which
+        // preempts the assignment and just uses the AC.
+        int assign_left_reg(VarRec *source, int rel_addr = 0);
 
-        // This function returns the next register assignment. If necessary
-        // it spills before returning the register number and updates the vector.
-        int get_reg_assign(VarRec *source);
+        // Same assign_left_req() function except it does it for the right.
+        int assign_right_reg(VarRec *source, int rel_addr = 0);
+
+        // Common call for assign left or assign right.
+        int assign_l_or_r_reg(int reg_num, VarRec *source, int rel_addr);
 
         // This method assigns the specified variable record to the AC register.
         void assign_to_ac(VarRec *source);
+
+        // This method will spill the variable back to memory.
+        void spill_register(int reg_num);
 };
 
 #endif      /* CODEGENERATOR_H */

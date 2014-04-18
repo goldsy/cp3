@@ -23,20 +23,25 @@ CodeGenerator::CodeGenerator()
     // Sized to 6 because I want reg 0 as my 0 value register
     // and this will make sure indexes 1-3 align with register
     // numbers 1-3. Index zero will never be used.
+    // Reg 1 - LHS reg.
+    // Reg 2 - RHS reg.
     // Reg 4 - Reserve for storing immediates to memory.
     // Reg 5 - Accumulator
     // Reg 6 - Stack Ptr / Frame Ptr
     // Reg 7 - PC
-    _reg_assign.resize(6);
+    vector<pair<VarRec *, int> > reg_assign;
+    reg_assign.resize(6);
 
-    for (int index = 0; static_cast<unsigned int>(index) < _reg_assign.size(); ++index)
+    for (int index = 0; static_cast<unsigned int>(index) < reg_assign.size(); ++index)
     {
-        _reg_assign[index] = 0;
+        reg_assign[index] = make_pair(static_cast<VarRec *>(0), 0);
     }
 
-    // TODO: GET RID OF THE REG ASSIGNMENT STUFF. ALWAYS SPILL.
+    _reg_assign.push(reg_assign);
+
+    // TODO: GET RID OF THE ROUND ROBIN REG ASSIGNMENT STUFF. ALWAYS SPILL.
     // Don't use register 0.
-    _next_assignment = 1;
+    //_next_assignment = 1;
 
     // Set the initial variable offset for globals.
     //_offset_stack.push(INIT_FRAME_OFFSET);
@@ -439,85 +444,81 @@ void CodeGenerator::error(TmOp code, string funct)
 }
 
 
-// Determines if the specified variable is already loaded into a register.
-int CodeGenerator::is_loaded(VarRec *source)
+// This function assigns the specified variable to the left register.
+// There is a check if the variable is assigne to the accumulator which
+// preempts the assignment and just uses the AC.
+int CodeGenerator::assign_left_reg(VarRec *source, int rel_addr)
 {
-    int reg_assignment = 0;
-    int index = 1;
-
-    while ((reg_assignment == 0) && (static_cast<unsigned int>(index) < _reg_assign.size()))
-    {
-        if (_reg_assign[index] == source)
-        {
-            reg_assignment = index;
-        }
-
-        ++index;
-    }
-
-    return reg_assignment;
+    // This function will load the value and store the values in the
+    // register assignment stack.
+    return assign_l_or_r_reg(LHS_REG, source, rel_addr);
 }
 
 
-// This function returns the next register assignment. If necessary
-// it spills before returning the register number and updates the vector.
-int CodeGenerator::get_reg_assign(VarRec *source)
+// Convenience function.
+int CodeGenerator::assign_right_reg(VarRec *source, int rel_addr)
 {
-    int reg_assignment = is_loaded(source);
-
-    if (!reg_assignment)
-    {
-        // Variable isn't already loaded. Find next register and
-        // see if it needs to be spilled.
-        if (_reg_assign[_next_assignment])
-        {
-            // Spill the value back to memory.
-            emit_store_mem(_next_assignment, 
-                    _reg_assign[_next_assignment]->get_memory_loc(), 
-                    ZERO_REG,
-                    "Spill register " + fmt_int(_next_assignment) + 
-                        " back to memory loc: " + 
-                        fmt_int(_reg_assign[_next_assignment]->get_memory_loc()));
-        }
-
-        // Only load from memory if it was stored in memory. The
-        // temps won't (like the AC).
-        // And in the case of the unary minus we mult. by -1 which is neither
-        // in memory nor has a corresponding VarRec.
-        if (source && source->get_memory_loc())
-        {
-            emit_load_mem(_next_assignment, source->get_memory_loc(), ZERO_REG,
-                    "LOADING var " + source->get_name() + " to reg num " +
-                    fmt_int(_next_assignment));
-        }
-
-        _reg_assign[_next_assignment] = source;
-        reg_assignment = _next_assignment;
-        advance_next_assignment();
-    }
-
-    return reg_assignment;
+    // This function will load the value and store the values in the
+    // register assignment stack.
+    return assign_l_or_r_reg(RHS_REG, source, rel_addr);
 }
 
 
-// Round robin the next assignment number.
-void CodeGenerator::advance_next_assignment()
+// This function assigns the specified variable to the left or right register.
+// There is a check if the variable is assigne to the accumulator which
+// preempts the assignment and just uses the AC.
+int CodeGenerator::assign_l_or_r_reg(int reg_num, VarRec *source, int rel_addr)
 {
-    ++_next_assignment;
+    int target_reg;
 
-    // This reserves first one and last two register numbers, but stores them in the
-    // vector.
-    if (static_cast<unsigned int>(_next_assignment) > (_reg_assign.size() - 3))
+    // If var assigned to the AC use that, otherwise assign to LHS register.
+    if (_reg_assign.top()[AC_REG].first == source)
     {
-        // Turn the corner.
-        _next_assignment = 1;
+        // Already loaded and assigned to AC.
+        target_reg = AC_REG;
     }
+    else
+    {
+        // TODO: THIS NEEDS TO BE UPDATED TO CHECK FOR GLOBAL AND USE FP OR ZERO REG.
+        // TODO: THIS NEEDS TO BE UPDATED TO CHECK FOR GLOBAL AND USE FP OR ZERO REG.
+        // TODO: THIS NEEDS TO BE UPDATED TO CHECK FOR GLOBAL AND USE FP OR ZERO REG.
+        // TODO: THIS NEEDS TO BE UPDATED TO CHECK FOR GLOBAL AND USE FP OR ZERO REG.
+        // TODO: THIS NEEDS TO BE UPDATED TO CHECK FOR GLOBAL AND USE FP OR ZERO REG.
+        emit_load_mem(reg_num, rel_addr, ZERO_REG,
+                "LOADING var " + source->get_name() + " to reg num " +
+                fmt_int(reg_num));
+
+        _reg_assign.top()[reg_num] = make_pair(source, rel_addr);
+
+        target_reg = reg_num;
+    }
+
+    return target_reg;
 }
 
 
 // Assign the source variable record to the accumulator.
 void CodeGenerator::assign_to_ac(VarRec *source)
 {
-    _reg_assign[AC_REG] = source;
+    _reg_assign.top()[AC_REG] = make_pair(source, 0);
 }
 
+// This method will spill the specified register back to memory.
+void CodeGenerator::spill_register(int reg_num)
+{
+    // TODO: THIS NEEDS TO BE UPDATED TO CHECK FOR GLOBAL AND USE FP OR ZERO REG.
+    // TODO: THIS NEEDS TO BE UPDATED TO CHECK FOR GLOBAL AND USE FP OR ZERO REG.
+    // TODO: THIS NEEDS TO BE UPDATED TO CHECK FOR GLOBAL AND USE FP OR ZERO REG.
+    // TODO: THIS NEEDS TO BE UPDATED TO CHECK FOR GLOBAL AND USE FP OR ZERO REG.
+    // TODO: THIS NEEDS TO BE UPDATED TO CHECK FOR GLOBAL AND USE FP OR ZERO REG.
+    // Get all of the info needed to get it back into memory.
+    VarRec *target_var = _reg_assign.top()[reg_num].first;
+
+    int target_offset = _reg_assign.top()[reg_num].second;
+
+    // Check if this is a global or local variable.
+    // TODO: CHECK GLOBAL/LOCAL
+    emit_store_mem(reg_num, target_offset, ZERO_REG,
+            "Spilling var: " + target_var->get_name() + " to memory d=" +
+            fmt_int(target_offset));
+}

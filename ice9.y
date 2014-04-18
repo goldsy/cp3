@@ -15,7 +15,7 @@
 using namespace std;
 
 // Flag used to turn on some debug messages.
-bool debugFlag = false;
+bool debugFlag = true;
 bool tmDebugFlag = true;
 
 extern int yynewlines;
@@ -66,6 +66,14 @@ typedef struct BkPatch {
 
 deque<BkPatch> if_jump_next_q;
 deque<BkPatch> if_jump_end_q;
+
+
+// Because of nesting there could be more than one queue of jump to ends.
+// Because of breaks there could be more than one jump to end of do.
+stack<deque<BkPatch> > dofa_jump_end_stack;
+
+//stack<BkPatch> dofa_jump_top_stack;
+stack<int> dofa_jump_top_stack;
 
 
 %}
@@ -790,21 +798,13 @@ stm:
             // Bools and ints will have the same TM code.
             // Load lvalue into register if necessary.
             // Load exp into register if necessary.
-            int lhs_reg = cg.get_reg_assign($<var_rec>1);
-            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
-            // This is stupid but the round robin thing is screwing me.
-            // This fixes my assignment problem because I always have 3
-            // registers to use.
-            // THIS DOESN"T WORK EITHER.
-            // THIS DOESN"T WORK EITHER.
-            // THIS DOESN"T WORK EITHER.
-            // THIS DOESN"T WORK EITHER.
-            // THIS DOESN"T WORK EITHER.
-            // TODO: FIX THE REGISTER ASSIGNMENT STUFF.
-            lhs_reg = cg.get_reg_assign($<var_rec>1);
-
+            int lhs_reg = cg.assign_left_reg($<var_rec>1, $<var_rec>1->get_memory_loc());
+            int rhs_reg = cg.assign_right_reg($<var_rec>3, $<var_rec>3->get_memory_loc());    
             cg.emit_load_value(lhs_reg, 0, rhs_reg, "Assignment of " +
                 $<var_rec>3->get_name() + " to " + $<var_rec>1->get_name());
+
+            // Dump the register back to memory.
+            cg.spill_register(lhs_reg);
         }
         else
         {
@@ -843,7 +843,7 @@ stm:
             cg.emit_note("------- BEGIN WRITE ---------");
         }
 
-        int rhs_reg = cg.get_reg_assign($<var_rec>2);    
+        int rhs_reg = cg.assign_right_reg($<var_rec>2, $<var_rec>2->get_memory_loc());    
 
         if (is_int($<var_rec>2->get_type()))
         {
@@ -886,7 +886,7 @@ stm:
             cg.emit_note("------- BEGIN WRITES ---------");
         }
 
-        int rhs_reg = cg.get_reg_assign($<var_rec>2);    
+        int rhs_reg = cg.assign_right_reg($<var_rec>2, $<var_rec>2->get_memory_loc());    
 
         if (is_int($<var_rec>2->get_type()))
         {
@@ -950,7 +950,7 @@ qjumpnext:
         // Queue the jump to elseif or else block.
         BkPatch ifjump;
 
-        ifjump.test_reg_num = cg.get_reg_assign($<var_rec>0);
+        ifjump.test_reg_num = cg.assign_left_reg($<var_rec>0, $<var_rec>0->get_memory_loc());
         ifjump.line_num = $$;
         ifjump.note = "Jump from if stmt to elseif, else or ifend.";
 
@@ -1077,7 +1077,7 @@ elseifentry:
 //        // Queue the jump to elseif or else block.
 //        BkPatch ifjump;
 //
-//        ifjump.test_reg_num = cg.get_reg_assign($<var_rec>0);
+//        ifjump.test_reg_num = cg.assign_left_reg($<var_rec>0, $<var_rec>0->get_memory_loc());
 //        ifjump.line_num = $$;
 //        ifjump.note = "Jump from elseif stmt to elseif, else or end.";
 //
@@ -1140,12 +1140,18 @@ ifendentry:
     ;
 
 do:
-  TK_DO doentry exp TK_ARROW stms0 TK_OD
+  TK_DO doentry dofaentry exp qdofajumpend TK_ARROW stms0 TK_OD
   {
+    if (debugFlag)
+    {
+        printf("BEGINNING OF DO *RULE*\n");
+        fflush(0);
+    }
+
     // exp must be a bool.
     TypeRec *bool_rec = sm->lookup_type("bool");
 
-    if (!bool_rec->equal($<var_rec>3->get_type()))
+    if (!bool_rec->equal($<var_rec>4->get_type()))
     {
         // Type is not boolean.
         string errorMsg;
@@ -1156,6 +1162,57 @@ do:
 
     // Decrement the loop count. Leaving the do loop.
     --do_count;
+
+    // CODE GEN
+    // CODE GEN
+    // CODE GEN
+
+    if (debugFlag)
+    {
+        printf("JUST BEFORE TOP PATCH PROCESSING\n");
+        fflush(0);
+    }
+
+    // Get the top line of the do (Will only ever be one).
+    int top_line = dofa_jump_top_stack.top();
+
+    //cg.emit_load_value(PC_REG, (top_line - cg.get_curr_line() - 1), PC_REG, 
+    cg.emit_load_value(PC_REG, top_line, ZERO_REG, 
+        "FA/DO jump back to top of loop.");
+
+//    BkPatch top_patch = dofa_jump_top_stack.top();
+//
+//    cg.emit_jump(JEQ, top_patch.test_reg_num, (top_patch.line_num - 
+//        cg.get_curr_line() - 1), PC_REG, top_patch.note, top_patch.line_num);
+
+    // Remove the jump to top item.
+    dofa_jump_top_stack.pop();
+
+    if (debugFlag)
+    {
+        printf("GOT TO END OF JUMP TO TOP OF DO/FA\n");
+        fflush(0);
+    }
+
+    // EMIT THE JUMP TO END*S* CODE HERE. MUST BE AFTER JUMP TO TOP.
+    deque<BkPatch> do_jump_end_q = dofa_jump_end_stack.top();
+
+    while (do_jump_end_q.size() > 0)
+    {
+        // Get the item (Really should only ever be one).
+        BkPatch patch = do_jump_end_q.back();
+
+        cg.emit_jump(JEQ, patch.test_reg_num, (cg.get_curr_line() - 
+            patch.line_num - 1), PC_REG, patch.note, patch.line_num);
+
+        // Remove the item.
+        do_jump_end_q.pop_back();
+    }
+
+    cg.emit_note("----------- END DO -----------");
+
+    // Leaving this do loop.
+    dofa_jump_end_stack.pop();
   }
   ;
 
@@ -1164,8 +1221,89 @@ doentry:
        {
             // No scope change, but need to track do's for break usage.
             ++do_count;
+
+            if (tmDebugFlag)
+                cg.emit_note("----------- BEGIN DO -----------");
        }
        ;
+
+dofaentry:
+       /* empty rule */
+       {
+            // ==================================================================
+            // Shared queue by fa and do, but the count is needed for symantic
+            // analysis so it can be sure the fa's and do's end in the right
+            // order.
+            // ==================================================================
+            // CODE GEN
+            // CODE GEN
+            // CODE GEN
+            // Push a jump to top on the jump to top stack.
+//            BkPatch jump_to_top;
+//
+//            // This is an unconditional jump so the test register is always ZERO.
+//            jump_to_top.test_reg_num = ZERO_REG;
+//            jump_to_top.line_num = cg.get_curr_line();
+//            jump_to_top.note = "Jump from do/fa end to top of do/fa block.";
+//
+//            dofa_jump_top_stack.push(jump_to_top);
+//
+//            cg.reserve_lines(1);
+            dofa_jump_top_stack.push(cg.get_curr_line());
+
+            cg.emit_note("Storing line " + fmt_int(cg.get_curr_line()) +
+                " as top of do/fa loop.");
+
+            // We've entered a new fa/do block.
+            // Create a new queue of jump to end of do/fa.
+            deque<BkPatch> dofa_jump_end_q;
+            dofa_jump_end_stack.push(dofa_jump_end_q);
+
+            if (debugFlag)
+            {
+                printf("END OF DOFAENTRY!\n");
+                fflush(0);
+            }
+       }
+       ;
+
+qdofajumpend:
+    /* empty rule */
+    {
+        if (debugFlag)
+        {
+            printf("BEGINNING OF QDOFAJUMPEND\n");
+            fflush(0);
+        }
+
+        // TODO: MOVE THIS TO A FUNCTION???
+        // This rule is used to queue backpatches for jumping to the end
+        // of the do stmt block.
+        if (tmDebugFlag)
+        {
+            cg.emit_note("RESERVE LINE " + fmt_int(cg.get_curr_line()) + 
+                " FOR JUMP TO END OF DO/FA BLOCK.");
+        }
+
+        BkPatch jump_to_end;
+
+        // Get the test register for the exp variable.
+        jump_to_end.test_reg_num = cg.assign_left_reg($<var_rec>0, 
+            $<var_rec>0->get_memory_loc());
+        jump_to_end.line_num = cg.get_curr_line();
+        jump_to_end.note = "Jump from do/fa to end of do/fa block.";
+
+        dofa_jump_end_stack.top().push_back(jump_to_end);
+
+        cg.reserve_lines(1);
+
+        if (debugFlag)
+        {
+            printf("END OF QDOFAJUMPEND\n");
+            fflush(0);
+        }
+    }
+    ;
 
 fa:
   TK_FA TK_ID faentry TK_ASSIGN exp TK_TO exp TK_ARROW stms0 TK_AF
@@ -1415,30 +1553,43 @@ exp:
     }
    | TK_MINUS exp  
     {
-        if (is_int_or_boolean($<var_rec>2->get_type())) {
-            $$ = $<var_rec>2;
-        }
-        else {
+        if (!is_int_or_boolean($<var_rec>2->get_type()))
+        {
             // TYPE ERROR!
             yyerror("Incompatible type for unary minus");
             exit(0);
         }
 
 
-        // CODE GEN
-        // CODE GEN
-        // CODE GEN
-        // TODO: UNARY MINUS OP ON EXP MIGHT NOT CHANGE VALUE IN VARIABLE.
-        // TODO: UNARY MINUS OP ON EXP MIGHT NOT CHANGE VALUE IN VARIABLE.
-        // TODO: UNARY MINUS OP ON EXP MIGHT NOT CHANGE VALUE IN VARIABLE.
-        int rhs_reg = cg.get_reg_assign($$);
+        TypeRec *target_type = $<var_rec>2->get_type();
 
-        // Get available register for temp use.
-        int neg_one_reg = cg.get_reg_assign(0);
+        // Need a return variable.
+        VarRec *rtn_var = new VarRec("@unary_minus_return", target_type);
+
+        // Get available register for -1 use.
+//        VarRec *neg_one_var = new VarRec("@neg_one", target_type, true, "-1");
+
+        // CODE GEN
+        // CODE GEN
+        // CODE GEN
+        int rhs_reg = cg.assign_right_reg($<var_rec>2, $<var_rec>2->get_memory_loc());
+
+        // Assign the return value to the accumulator.
+        // Must not be assigned until the RHS regsiter is determined because it might
+        // be the AC too, but that is okay.
+        cg.assign_to_ac(rtn_var);
+
+        // The implied neg one needs to be stored in memory.
+//        neg_one_var->set_memory_loc(cg.emit_init_int(
+//            atoi(neg_one_var->get_value().c_str()), 
+//            "Storing neg one literal " + neg_one_var->get_value()));
+
+//        int neg_one_reg = cg.get_reg_assign(neg_one_var);
 
         // To make this negative just create a -1 register and multiply.
-        cg.emit_load_value(neg_one_reg, -1, ZERO_REG, "Load -1 into register");
-        cg.emit_math(MUL, rhs_reg, neg_one_reg, rhs_reg, "Unary minus op");
+//        cg.emit_load_value(neg_one_reg, -1, ZERO_REG, "Load -1 into register");
+        cg.emit_load_value(IMMED_REG, -1, ZERO_REG, "Load -1 into immediate register");
+        cg.emit_math(MUL, AC_REG, IMMED_REG, rhs_reg, "Unary minus op");
     }
    | TK_QUEST exp  
     {
@@ -1630,8 +1781,8 @@ exp:
             // CODE GEN
             // CODE GEN
             // CODE GEN
-            int lhs_reg = cg.get_reg_assign($<var_rec>1);
-            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+            int lhs_reg = cg.assign_left_reg($<var_rec>1, $<var_rec>1->get_memory_loc());
+            int rhs_reg = cg.assign_right_reg($<var_rec>3, $<var_rec>3->get_memory_loc());    
 
             // Assign the return value to the accumulator.
             // Must check this after getting the rhs and lhs assignments because
@@ -1700,8 +1851,8 @@ exp:
             }
 
             // Get rhs and lhs register assignments.
-            int lhs_reg = cg.get_reg_assign($<var_rec>1);
-            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+            int lhs_reg = cg.assign_left_reg($<var_rec>1, $<var_rec>1->get_memory_loc());
+            int rhs_reg = cg.assign_right_reg($<var_rec>3, $<var_rec>3->get_memory_loc());    
 
             // Assign the return value to the accumulator.
             // Must check this after getting the rhs and lhs assignments because
@@ -1729,8 +1880,8 @@ exp:
             VarRec *rtn_var = new VarRec("starop_return", $<var_rec>1->get_type());
 
             // Get the exp register assignments.
-            int lhs_reg = cg.get_reg_assign($<var_rec>1);
-            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+            int lhs_reg = cg.assign_left_reg($<var_rec>1, $<var_rec>1->get_memory_loc());
+            int rhs_reg = cg.assign_right_reg($<var_rec>3, $<var_rec>3->get_memory_loc());    
 
             // Assign the return value to the accumulator.
             // Must check this after getting the rhs and lhs assignments because
@@ -1783,8 +1934,8 @@ exp:
             }
 
             // Get rhs and lhs register assignments.
-            int lhs_reg = cg.get_reg_assign($<var_rec>1);
-            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+            int lhs_reg = cg.assign_left_reg($<var_rec>1, $<var_rec>1->get_memory_loc());
+            int rhs_reg = cg.assign_right_reg($<var_rec>3, $<var_rec>3->get_memory_loc());    
 
             // Assign the return value to the accumulator.
             // Must check this after getting the rhs and lhs assignments because
@@ -1822,8 +1973,8 @@ exp:
             }
 
             // Get the rhs and lhs register assignments.
-            int lhs_reg = cg.get_reg_assign($<var_rec>1);
-            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+            int lhs_reg = cg.assign_left_reg($<var_rec>1, $<var_rec>1->get_memory_loc());
+            int rhs_reg = cg.assign_right_reg($<var_rec>3, $<var_rec>3->get_memory_loc());    
 
             // Assign the return value to the accumulator.
             // Must check this after getting the rhs and lhs assignments because
@@ -1863,8 +2014,8 @@ exp:
             // CODE GEN
             // CODE GEN
             // CODE GEN
-            int lhs_reg = cg.get_reg_assign($<var_rec>1);
-            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+            int lhs_reg = cg.assign_left_reg($<var_rec>1, $<var_rec>1->get_memory_loc());
+            int rhs_reg = cg.assign_right_reg($<var_rec>3, $<var_rec>3->get_memory_loc());    
 
             // Assign the return value to the accumulator.
             // Must check this after getting the rhs and lhs assignments because
@@ -1915,8 +2066,8 @@ exp:
             // CODE GEN
             // CODE GEN
             // CODE GEN
-            int lhs_reg = cg.get_reg_assign($<var_rec>1);
-            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+            int lhs_reg = cg.assign_left_reg($<var_rec>1, $<var_rec>1->get_memory_loc());
+            int rhs_reg = cg.assign_right_reg($<var_rec>3, $<var_rec>3->get_memory_loc());    
 
             // Assign the return value to the accumulator.
             // Must check this after getting the rhs and lhs assignments because
@@ -1967,8 +2118,8 @@ exp:
             // CODE GEN
             // CODE GEN
             // CODE GEN
-            int lhs_reg = cg.get_reg_assign($<var_rec>1);
-            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+            int lhs_reg = cg.assign_left_reg($<var_rec>1, $<var_rec>1->get_memory_loc());
+            int rhs_reg = cg.assign_right_reg($<var_rec>3, $<var_rec>3->get_memory_loc());    
 
             // Assign the return value to the accumulator.
             // Must check this after getting the rhs and lhs assignments because
@@ -1977,7 +2128,7 @@ exp:
 
             if (tmDebugFlag)
             {
-                cg.emit_note("------- BEGIN INT GREATER THAN (==) ---------");
+                cg.emit_note("------- BEGIN INT GREATER THAN (>) ---------");
             }
 
             cg.emit_math(SUB, AC_REG, lhs_reg, rhs_reg, "SUB to check greater than.");
@@ -1998,7 +2149,7 @@ exp:
 
             if (tmDebugFlag)
             {
-                cg.emit_note("------- END INT GREATER THAN (==) ---------");
+                cg.emit_note("------- END INT GREATER THAN (>) ---------");
             }
         }
         else {
@@ -2019,8 +2170,8 @@ exp:
             // CODE GEN
             // CODE GEN
             // CODE GEN
-            int lhs_reg = cg.get_reg_assign($<var_rec>1);
-            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+            int lhs_reg = cg.assign_left_reg($<var_rec>1, $<var_rec>1->get_memory_loc());
+            int rhs_reg = cg.assign_right_reg($<var_rec>3, $<var_rec>3->get_memory_loc());    
 
             // Assign the return value to the accumulator.
             // Must check this after getting the rhs and lhs assignments because
@@ -2029,7 +2180,7 @@ exp:
 
             if (tmDebugFlag)
             {
-                cg.emit_note("------- BEGIN INT LESS THAN (==) ---------");
+                cg.emit_note("------- BEGIN INT LESS THAN (<) ---------");
             }
 
             cg.emit_math(SUB, AC_REG, lhs_reg, rhs_reg, "SUB to check less than.");
@@ -2050,7 +2201,7 @@ exp:
 
             if (tmDebugFlag)
             {
-                cg.emit_note("------- END INT LESS THAN (==) ---------");
+                cg.emit_note("------- END INT LESS THAN (>) ---------");
             }
         }
         else {
@@ -2071,8 +2222,8 @@ exp:
             // CODE GEN
             // CODE GEN
             // CODE GEN
-            int lhs_reg = cg.get_reg_assign($<var_rec>1);
-            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+            int lhs_reg = cg.assign_left_reg($<var_rec>1, $<var_rec>1->get_memory_loc());
+            int rhs_reg = cg.assign_right_reg($<var_rec>3, $<var_rec>3->get_memory_loc());    
 
             // Assign the return value to the accumulator.
             // Must check this after getting the rhs and lhs assignments because
@@ -2081,7 +2232,7 @@ exp:
 
             if (tmDebugFlag)
             {
-                cg.emit_note("------- BEGIN INT GREATER THAN (==) ---------");
+                cg.emit_note("------- BEGIN INT GREATER THAN EQ (>=) ---------");
             }
 
             cg.emit_math(SUB, AC_REG, lhs_reg, rhs_reg, "SUB to check greater than.");
@@ -2102,7 +2253,7 @@ exp:
 
             if (tmDebugFlag)
             {
-                cg.emit_note("------- END INT GREATER THAN (==) ---------");
+                cg.emit_note("------- END INT GREATER THAN EQ (>=) ---------");
             }
         }
         else {
@@ -2123,8 +2274,8 @@ exp:
             // CODE GEN
             // CODE GEN
             // CODE GEN
-            int lhs_reg = cg.get_reg_assign($<var_rec>1);
-            int rhs_reg = cg.get_reg_assign($<var_rec>3);    
+            int lhs_reg = cg.assign_left_reg($<var_rec>1, $<var_rec>1->get_memory_loc());
+            int rhs_reg = cg.assign_right_reg($<var_rec>3, $<var_rec>3->get_memory_loc());    
 
             // Assign the return value to the accumulator.
             // Must check this after getting the rhs and lhs assignments because
@@ -2133,7 +2284,7 @@ exp:
 
             if (tmDebugFlag)
             {
-                cg.emit_note("------- BEGIN INT LESS THAN (==) ---------");
+                cg.emit_note("------- BEGIN INT LESS THAN EQ (<=) ---------");
             }
 
             cg.emit_math(SUB, AC_REG, lhs_reg, rhs_reg, "SUB to check less than.");
@@ -2154,7 +2305,7 @@ exp:
 
             if (tmDebugFlag)
             {
-                cg.emit_note("------- END INT LESS THAN (==) ---------");
+                cg.emit_note("------- END INT LESS THAN EQ (<=) ---------");
             }
         }
         else {
