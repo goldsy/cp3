@@ -65,7 +65,7 @@ typedef struct BkPatch {
 } BkPatch;
 
 deque<BkPatch> if_jump_next_q;
-deque<BkPatch> if_jump_end_q;
+stack<deque<BkPatch> > if_jump_end_stack;
 
 
 // Because of nesting there could be more than one queue of jump to ends.
@@ -909,19 +909,19 @@ stm:
    ;
 
 if:
-  TK_IF exp qjumpnext TK_ARROW stms qjumpend elseif ifend
+  TK_IF ifentry exp qjumpnext TK_ARROW stms qjumpend elseif ifend
   {
     // DEBUG
     if (debugFlag)
     {
-        printf("IF JUMP NEXT LINE NUM %d\n", $<intt>3);
-        printf("LINE NUM AT END OF COMPLETE IF STMT %d\n", $<intt>8);
+        printf("IF JUMP NEXT LINE NUM %d\n", $<intt>4);
+        printf("LINE NUM AT END OF COMPLETE IF STMT %d\n", $<intt>9);
     }
 
     // exp must be a bool.
     TypeRec *bool_rec = sm->lookup_type("bool");
 
-    if (!bool_rec->equal($<var_rec>2->get_type()))
+    if (!bool_rec->equal($<var_rec>3->get_type()))
     {
         // Type is not boolean.
         string errorMsg;
@@ -933,6 +933,22 @@ if:
     // All code emitted in sub-rules.
   }
   ;
+
+ifentry:
+    /* empty rule */
+    {
+        // We've entered another if block so push a another end queue onto
+        // the stack.
+        // Create a new queue of jump to end of if block.
+        deque<BkPatch> if_jump_end_q;
+        if_jump_end_stack.push(if_jump_end_q);
+
+        if (tmDebugFlag)
+        {
+            cg.emit_note("------- BEGIN IF -------");
+        }
+    }
+    ;
 
 qjumpnext:
     /* empty rule */
@@ -977,7 +993,7 @@ qjumpend:
         jump_to_end.line_num = cg.get_curr_line();
         jump_to_end.note = "Jump from if or elseif to end of if block.";
 
-        if_jump_end_q.push_back(jump_to_end);
+        if_jump_end_stack.top().push_back(jump_to_end);
 
         cg.reserve_lines(1);
     }
@@ -1029,7 +1045,7 @@ elseif:
         //jump_to_end.line_num = cg.get_curr_line();
         //jump_to_end.note = "Jump from if or elseif to end of if block.";
 
-        //if_jump_end_q.push_back(jump_to_end);
+        //if_jump_end_stack.push_back(jump_to_end);
 
         //cg.reserve_lines(1);
     }
@@ -1052,7 +1068,7 @@ dqifjumpnext:
             BkPatch patch = if_jump_next_q.back();
 
             cg.emit_jump(JEQ, patch.test_reg_num, (cg.get_curr_line() - 
-                patch.line_num), PC_REG, patch.note, patch.line_num);
+                patch.line_num - 1), PC_REG, patch.note, patch.line_num);
 
             // Remove the item.
             if_jump_next_q.pop_back();
@@ -1096,6 +1112,8 @@ ifend:
         // CODE GEN
         // CODE GEN
         // CODE GEN
+        deque<BkPatch> if_jump_end_q = if_jump_end_stack.top();
+
         while (if_jump_end_q.size() > 0)
         {
             // Get the item (Really should only ever be one).
@@ -1107,8 +1125,16 @@ ifend:
             // Remove the item.
             if_jump_end_q.pop_back();
         }
+
+        // We're leaving this if block.
+        if_jump_end_stack.pop();
+
+        if (tmDebugFlag)
+        {
+            cg.emit_note("------------------- END IF -------------------");
+        }
     }
-   | TK_BOX TK_ELSE TK_ARROW dqifjumpnext ifendentry stms TK_FI
+   | TK_BOX TK_ELSE TK_ARROW dqifjumpnext stms TK_FI
     {
         // Return current line which is end of if stmt.
         $$ = cg.get_curr_line();
@@ -1117,6 +1143,8 @@ ifend:
         // CODE GEN
         // CODE GEN
         // Back patch the end for every jump to end.
+        deque<BkPatch> if_jump_end_q = if_jump_end_stack.top();
+
         while (if_jump_end_q.size() > 0)
         {
             // Get the item (Really should only ever be one).
@@ -1128,16 +1156,11 @@ ifend:
             // Remove the item.
             if_jump_end_q.pop_back();
         }
+
+        // We're leaving this if block.
+        if_jump_end_stack.pop();
     }
    ;
-
-ifendentry:
-        /* empty rule */
-    {
-        // TODO: REMOVE AFTER TESTING.
-        //$$ = cg.get_curr_line();
-    }
-    ;
 
 do:
   TK_DO doentry dofaentry exp qdofajumpend TK_ARROW stms0 TK_OD
