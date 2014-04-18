@@ -909,13 +909,13 @@ stm:
    ;
 
 if:
-  TK_IF ifentry exp qjumpnext TK_ARROW stms qjumpend elseif ifend
+  TK_IF ifentry exp qjumpnext TK_ARROW stms elseif ifend
   {
     // DEBUG
     if (debugFlag)
     {
         printf("IF JUMP NEXT LINE NUM %d\n", $<intt>4);
-        printf("LINE NUM AT END OF COMPLETE IF STMT %d\n", $<intt>9);
+        printf("LINE NUM AT END OF COMPLETE IF STMT %d\n", $<intt>8);
     }
 
     // exp must be a bool.
@@ -1006,12 +1006,12 @@ elseif:
         printf("ELSEIF EMPTY LINE %d\n", cg.get_curr_line());
         $$ = 0;
     }
-   | elseif TK_BOX dqifjumpnext exp qjumpnext elseifentry TK_ARROW stms qjumpend
+   | elseif TK_BOX qjumpend dqifjumpnext exp qjumpnext elseifentry TK_ARROW stms
     {
         // exp must be a bool.
         TypeRec *bool_rec = sm->lookup_type("bool");
 
-        if (!bool_rec->equal($<var_rec>4->get_type()))
+        if (!bool_rec->equal($<var_rec>5->get_type()))
         {
             // Type is not boolean.
             string errorMsg;
@@ -1102,7 +1102,7 @@ elseifentry:
     ;
 
 ifend:
-   dqifjumpnext TK_FI
+    qjumpend dqifjumpnext TK_FI
     {
         // No else statement so clear the jump next queue because the
         // preceding if or else if doesn't need to jump.
@@ -1120,7 +1120,7 @@ ifend:
             BkPatch patch = if_jump_end_q.back();
 
             cg.emit_jump(JEQ, patch.test_reg_num, (cg.get_curr_line() - 
-                patch.line_num), PC_REG, patch.note, patch.line_num);
+                patch.line_num - 1), PC_REG, patch.note, patch.line_num);
 
             // Remove the item.
             if_jump_end_q.pop_back();
@@ -1134,7 +1134,7 @@ ifend:
             cg.emit_note("------------------- END IF -------------------");
         }
     }
-   | TK_BOX TK_ELSE TK_ARROW dqifjumpnext stms TK_FI
+   | TK_BOX TK_ELSE TK_ARROW qjumpend dqifjumpnext stms TK_FI
     {
         // Return current line which is end of if stmt.
         $$ = cg.get_curr_line();
@@ -1151,7 +1151,7 @@ ifend:
             BkPatch patch = if_jump_end_q.back();
 
             cg.emit_jump(JEQ, patch.test_reg_num, (cg.get_curr_line() - 
-                patch.line_num), PC_REG, patch.note, patch.line_num);
+                patch.line_num - 1), PC_REG, patch.note, patch.line_num);
 
             // Remove the item.
             if_jump_end_q.pop_back();
