@@ -20,6 +20,7 @@ const string NOTE_PADDING = "\t\t\t";
 const int ZERO_REG = 0;
 const int LHS_REG = 1; /* LHS register */
 const int RHS_REG = 2; /* RHS register */
+const int STRIDE_REG = 3; /* STRIDE register */
 const int IMMED_REG = 4; /* Immediate register */
 const int AC_REG = 5; /* Accumulator register */
 const int FP_REG = 6; /* Frame Pointer register */
@@ -178,6 +179,15 @@ class CodeGenerator {
 
         // This method will spill the variable back to memory.
         void spill_register(int reg_num);
+
+        // Method to get the next available frame offset and advance the offset.
+        int get_frame_offset(int size);
+
+        // Saves the register states for quick and dirty calculations.
+        void save_regs();
+
+        // Restores the register states after quick and dirty calculations.
+        void restore_regs();
 };
 
 #endif      /* CODEGENERATOR_H */

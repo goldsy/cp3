@@ -6,6 +6,7 @@
 
 #include <string>
 #include <list>
+#include <deque>
 
 
 using namespace std;
@@ -70,6 +71,7 @@ class TypeRec {
         TypeRec* get_sub_type();
         int get_size();
         TypeRec* get_primitive();
+        bool get_array_dims(deque<int> &dims);
 
         // Type equivalence operator
         bool equal(TypeRec *rhs);

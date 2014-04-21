@@ -20,7 +20,7 @@ TypeRec::TypeRec(
     _sub_type = sub_type;
 
     // Default the size to 1 which will be the size for the primitive types.
-    _size = 1;
+    _size = size;
     _ignore_size = false;
 }
 
@@ -132,6 +132,7 @@ int TypeRec::get_size()
 }
 
 
+
 // This function is designed to traverse to the bottom
 // of a chain of arrays to get the underlying primitive
 // type.
@@ -156,6 +157,34 @@ TypeRec* TypeRec::get_primitive()
     {
         // This level's sub_type is null.
         return _sub_type;
+    }
+}
+
+
+// This function is designed to traverse to the bottom
+// of a chain of arrays to get the underlying primitive
+// type.
+bool TypeRec::get_array_dims(deque<int> &array_dims)
+{
+    if (_base_type != arrayI9)
+    {
+        // This is not an array.
+        return false;
+    }
+    else 
+    {
+        // Push this dimension on the back.
+        array_dims.push_back(_size);
+
+        if (_sub_type && _sub_type->get_base_type() == arrayI9)
+        {
+            return _sub_type->get_array_dims(array_dims);
+        }
+        else
+        {
+            // We've recursed to the bottom. We're done.
+            return true;
+        }
     }
 }
 

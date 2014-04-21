@@ -57,6 +57,9 @@ string proc_name;
 TypeRec *proc_type = 0;
 list<VarRec *> *proc_var_rec_list = 0;
 
+// Deque to get the array dereference indexes up.
+deque<VarRec *> array_deref_indexes;
+
 // Stucture for back patching if statements.
 typedef struct BkPatch {
     int test_reg_num;
@@ -74,6 +77,14 @@ stack<deque<BkPatch> > dofa_jump_end_stack;
 
 //stack<BkPatch> dofa_jump_top_stack;
 stack<int> dofa_jump_top_stack;
+
+
+// This is a convenience function so that I don't mess up the not logic
+// in all the places I need to check what scope I'm in.
+bool is_global_scope()
+{
+    return (!in_proc_defn_flag);
+}
 
 
 %}
@@ -184,6 +195,15 @@ proginit:
         {
             // Initialize the FP to point to the end of memory.
             cg.emit_load_mem(FP_REG, 0, ZERO_REG, "Initialize the FP to end of mem.");
+
+            // Reserve locations 1-6 for regs 1-6 state storing machine state.
+            // Quick and dirty machine state storage.
+            cg.emit_init_int(0, "State storage 1.");
+            cg.emit_init_int(0, "State storage 2.");
+            cg.emit_init_int(0, "State storage 3.");
+            cg.emit_init_int(0, "State storage 4.");
+            cg.emit_init_int(0, "State storage 5.");
+            cg.emit_init_int(0, "State storage 6.");
         }
         ;
 
@@ -243,7 +263,7 @@ varlist:
             for (iter = $<string_list>1->begin(); iter != $<string_list>1->end(); ++iter)
             {
                 // Make sure that the ID isn't already in the current scope var list. (i.e. check the return on the insert.)
-                VarRec *temp = new VarRec(*iter, target_type);
+                VarRec *temp = new VarRec(*iter, target_type, is_global_scope());
 
                 if (!sm->insert_var(temp))
                 {
@@ -262,27 +282,111 @@ varlist:
                 // CODE GEN
                 if (target_type->is_array())
                 {
+                    if (tmDebugFlag)
+                    {
+                        cg.emit_note("--------- BEGIN DECLARE ARRAY -----------");
+                        }
+
                     // USE MEMORY LAYOUT of:
                     // # Dimensions
                     // 1 .. n Dimension Size
                     // These will be used for overrun checks.
+                    deque<int> array_dims;
 
-                    // NOTE THAT THIS NEEDS TO BE DONE FOR INT/BOOL AND STRING.
-                    if (is_int_or_boolean(target_type->get_primitive()))
+                    if (!target_type->get_array_dims(array_dims))
                     {
-                        // Interger and boolean case
-                        // TODO: FINISH INT/BOOL ARRAY ALLOCATION.
-                        // TODO: FINISH INT/BOOL ARRAY ALLOCATION.
-                        // TODO: FINISH INT/BOOL ARRAY ALLOCATION.
-                        cg.emit_note("TODO: INT/BOOL ARRAY ALLOCATION");
+                        printf("The target array type didn't return any dimensions");
+                        fflush(0);
                     }
-                    else
+
+                    // The allocated size will be 
+                    // one for the absolute address in memory which will be
+                    // used for pass by reference in procedures.
+                    // plus one for the number of array dims
+                    // plus one for *EACH* array dimension size.
+                    // plus the the space needed to store the data
+
+                    // The variable will get the address of the absolute address.
+                    temp->set_memory_loc(cg.emit_init_int(0, 
+                        "Declare space for var " + temp->get_name() + " of type " +
+                        target_type->get_name()));
+
+                    if (tmDebugFlag)
                     {
-                        // String case
-                        // TODO: FINISH STRING ARRAY ALLOCATION.
-                        // TODO: FINISH STRING ARRAY ALLOCATION.
-                        // TODO: FINISH STRING ARRAY ALLOCATION.
-                        cg.emit_note("TODO: STRING ARRAY ALLOCATION");
+                        cg.emit_note("Memory Loc of " + temp->get_name() +
+                            " is " + fmt_int(temp->get_memory_loc()));
+                    }
+
+                    // Load the absolute value into that memory location.
+                    int base_addr_reg = temp->get_base_addr_reg();
+
+//                    if (temp->is_global())
+//                    {
+//                        base_addr_reg = ZERO_REG;
+//                    }
+//                    else
+//                    {
+//                        base_addr_reg = FP_REG;
+//                    }
+
+                    // Load the absolute of the array into a register.
+                    // We haven't actually allocated this space to it yet.
+                    cg.emit_load_value(IMMED_REG, temp->get_memory_loc() + 1,
+                        base_addr_reg, "Loading absolute address of array.");
+
+                    // The immediate reg already has the target address + 1
+                    // loaded in it so just use that to set the memory location.
+                    cg.emit_store_mem(IMMED_REG, -1, IMMED_REG,
+                        "Storing absolute memory loc in IMMED_REG to memory.");
+
+                    // Allocate the number of dims.
+                    cg.emit_init_int(array_dims.size(), 
+                        "Declare space for array num of dims.");
+
+                    int total_array_size = 1;
+
+                    for (int index = 0; static_cast<unsigned int>(index) < array_dims.size(); ++index)
+                    {
+                        // Allocate the each dimension.
+                        cg.emit_init_int(array_dims[index], 
+                            "Declare space for array dims = " + 
+                            fmt_int(array_dims[index]));
+
+                        // Intermediate calculation for size of array.
+                        total_array_size *= array_dims[index];
+                    }
+
+                    // Allocate enought space for all elements.
+                    for (int i = 0; i < total_array_size; ++i)
+                    {
+                        // Allocate each data space.
+                        cg.emit_init_int(0, 
+                            "Declare space for array index " + 
+                            fmt_int(i));
+                    }
+
+// TODO: REMOVE AFTER TESTING.
+                    // NOTE THAT THIS NEEDS TO BE DONE FOR INT/BOOL AND STRING.
+//                    if (is_int_or_boolean(target_type->get_primitive()))
+//                    {
+//                        // Interger and boolean case
+//                        // TODO: FINISH INT/BOOL ARRAY ALLOCATION.
+//                        // TODO: FINISH INT/BOOL ARRAY ALLOCATION.
+//                        // TODO: FINISH INT/BOOL ARRAY ALLOCATION.
+//                        cg.emit_note("TODO: INT/BOOL ARRAY ALLOCATION");
+//                    }
+//                    else
+//                    {
+//                        // String case
+//                        // TODO: FINISH STRING ARRAY ALLOCATION.
+//                        // TODO: FINISH STRING ARRAY ALLOCATION.
+//                        // TODO: FINISH STRING ARRAY ALLOCATION.
+//                        cg.emit_note("TODO: STRING ARRAY ALLOCATION");
+//                    }
+
+                    if (tmDebugFlag)
+                    {
+                        cg.emit_note("--------- END DECLARE ARRAY -----------");
                     }
                 }
                 else if (is_int_or_boolean(target_type))
@@ -385,7 +489,7 @@ arraydims:
                 exit(0);
             }
 
-            $$ = new TypeRec("anonymous", arrayI9, $<type_rec>4, atoi($<str>2));
+            $$ = new TypeRec("@anonymous", arrayI9, $<type_rec>4, atoi($<str>2));
          }
          ;
 
@@ -513,6 +617,9 @@ declistx:
 
             for (id_iter = $<string_list>1->begin(); id_iter != $<string_list>1->end(); ++id_iter)
             {
+            // TODO: CHECK OUT THE GLOBAL FLAG HERE. NOT SURE WHICH IT SHOULD BE.
+            // TODO: CHECK OUT THE GLOBAL FLAG HERE. NOT SURE WHICH IT SHOULD BE.
+            // TODO: CHECK OUT THE GLOBAL FLAG HERE. NOT SURE WHICH IT SHOULD BE.
                 VarRec *temp = new VarRec(*id_iter, $<type_rec>3);
                 param_list->push_back(temp);
             }
@@ -587,6 +694,9 @@ prochelper:
             // stuff the return variable in the table.
             if ($<type_rec>0)
             {
+            // TODO: CHECK OUT THE GLOBAL FLAG HERE. NOT SURE WHICH IT SHOULD BE.
+            // TODO: CHECK OUT THE GLOBAL FLAG HERE. NOT SURE WHICH IT SHOULD BE.
+            // TODO: CHECK OUT THE GLOBAL FLAG HERE. NOT SURE WHICH IT SHOULD BE.
                 VarRec *rtn_var = new VarRec(proc_name, $<type_rec>0);
 
                 if ( !sm->insert_var(rtn_var) )
@@ -1378,7 +1488,8 @@ faentry:
        {
             sm->enter_scope();
             ++fa_count;
-            VarRec *id_rec = new VarRec($<str>0, sm->lookup_type("int"));
+            VarRec *id_rec = new VarRec($<str>0, sm->lookup_type("int"),
+                is_global_scope());
             id_rec->set_loop_counter_flag(true);
             sm->insert_var(id_rec);
        }
@@ -1387,10 +1498,10 @@ faentry:
 lvalue:
       TK_ID lvalue2    {
         // Lookup variable name in vars sym table.
-        VarRec *tempVar = sm->lookup_var($<str>1);
+        VarRec *targetVar = sm->lookup_var($<str>1);
         TypeRec *varType;
 
-        if (!tempVar)
+        if (!targetVar)
         {
             string errorMsg;
             errorMsg = "Undefined variable '";
@@ -1400,7 +1511,7 @@ lvalue:
             exit(0);
         }
 
-        varType = tempVar->get_type();
+        varType = targetVar->get_type();
 
         // DEBUG
         if (debugFlag)
@@ -1428,7 +1539,7 @@ lvalue:
 
             // Construct a new VarRec pointing to dereferenced mem loc (TBD P3).
             // It's type will match the dereferenced type of TK_ID.
-            TypeRec *derefType = tempVar->get_type();
+            TypeRec *derefType = targetVar->get_type();
             TypeRec *typeLocator = $<type_rec>2;
 
             // TODO: CLEANUP DEBUG STATEMENTS AFTER TESTING.
@@ -1455,25 +1566,155 @@ lvalue:
                 derefType = derefType->get_sub_type();
                 typeLocator = typeLocator->get_sub_type();
 
-                // Mem loc has to be determined here for P3.
             } while (typeLocator);
 
-            VarRec *newVarRec = new VarRec("anon_lvalue", derefType);
+            VarRec *newVarRec = new VarRec("anon_lvalue", derefType, 
+                targetVar->is_global());
+
+            // CODE GEN
+            // CODE GEN
+            // CODE GEN
+            
+            if (tmDebugFlag)
+            {
+                cg.emit_note("------- BEGIN ARRAY DEREFERENCE --------");
+            }
+
+            // Need to init space for the new lvalue we created.
+            newVarRec->set_memory_loc(cg.emit_init_int(0, 
+                "Declare space for referenced array location."));
+
+            // TODO: THIS IS GOING TO TAKE A BIT OF CODE COME BACK TO IT.
+            // TODO: THIS IS GOING TO TAKE A BIT OF CODE COME BACK TO IT.
+            // TODO: THIS IS GOING TO TAKE A BIT OF CODE COME BACK TO IT.
+            // Emit code to do runtime array bounds overrun check.
+            deque<int> source_array_dims;
+            targetVar->get_type()->get_array_dims(source_array_dims);
+
+            deque<int> deref_array_dims;
+            derefType->get_array_dims(deref_array_dims);
+
+            for (int index = 0; static_cast<unsigned int>(index) < deref_array_dims.size(); ++index)
+            {
+            }
+
+
+            // Got lots of calculations to do so dump the resisters.
+            // TODO: THIS MIGHT NOT BE NECESSARY.  TRY IT WITHOUT IT.
+            cg.save_regs();
+
+            // Mem loc has to be determined here for P3.
+            // TODO: For now assume that we will always derefence to a primitive type.
+            cg.emit_load_mem(IMMED_REG, targetVar->get_memory_loc(),
+                targetVar->get_base_addr_reg(), 
+                "Load the absolute address from memory.");
+
+            // Skip the number of dimensions which is what is in the first loc.
+            // and skip the first loc (i.e. first lock + num of dims).
+            cg.emit_load_mem(LHS_REG, 0, IMMED_REG,
+                "Loading number of dims.");
+
+            cg.emit_math(ADD, IMMED_REG, LHS_REG, IMMED_REG,
+                "Skipping dim sizes.");
+
+            cg.emit_load_value(LHS_REG, 1, ZERO_REG,
+                "Loading 1 for number of dims loc.");
+
+            cg.emit_math(ADD, IMMED_REG, LHS_REG, IMMED_REG,
+                "Skipping num of dims location.");
+
+            // Work from right to left, process the indexes to get offset.
+            // Set the index variable as the last one in the dereference chain.
+            VarRec *index_var = array_deref_indexes.back();
+
+            // Load the left most array dereference value.
+            cg.emit_load_mem(LHS_REG, index_var->get_memory_loc(),
+                index_var->get_base_addr_reg(),
+                "Load the left most array dereference value.");
+
+//            cg.emit_math(ADD, IMMED_REG, LHS_REG, IMMED_REG,
+//                "Skipping to last array dimension.");
+            cg.emit_math(ADD, AC_REG, LHS_REG, ZERO_REG,
+                "Skipping to last array dimension.");
+
+            // Set STRIDE_REG to initial stride of 1.
+            cg.emit_load_value(STRIDE_REG, 1, ZERO_REG, 
+                "Init stride reg (3) with a 1.");
+
+            // Set AC to ZERO in case this is a one dimension array.
+//            cg.emit_load_value(AC_REG, 0, ZERO_REG, 
+//                "Init accumulator with a 0.");
+
+            array_deref_indexes.pop_back();
+
+            int lookback_size_index = 1;
+
+            while (array_deref_indexes.size() > 0)
+            {
+                cg.emit_load_mem(RHS_REG, -lookback_size_index, IMMED_REG,
+                    "Load stride of previous array dim to RHS.");
+
+                cg.emit_math(MUL, STRIDE_REG, RHS_REG, STRIDE_REG,
+                    "Calc the stride of next array dim back.");
+
+                VarRec *index_var = array_deref_indexes.back();
+
+                // Load the next left most array dereference value.
+                cg.emit_load_mem(LHS_REG, index_var->get_memory_loc(),
+                    index_var->get_base_addr_reg(),
+                    "Load the next left most array dereference value.");
+
+                cg.emit_math(MUL, RHS_REG, LHS_REG, STRIDE_REG,
+                    "Calc offset for next array dereg back.");
+
+                cg.emit_math(ADD, AC_REG, RHS_REG, AC_REG,
+                    "Add the offset from this dereference.");
+
+                // SET THE RHS. WIDTH
+                // DO THE WIDTH IN A WAY THAT CAN BE DONE THE SAME FOR THE RIGHTMOST
+                // AND THE OTHERS.  MULTIPLY by 1's. MAYBE INIT SOME REGS with 1's.
+                array_deref_indexes.pop_back();
+
+                // Set the lookback index to look back another level.
+                ++lookback_size_index;
+            }
+
+            cg.emit_math(ADD, IMMED_REG, IMMED_REG, AC_REG,
+                "Add the total offset from dereference to the address.");
+
+            cg.emit_store_mem(IMMED_REG, newVarRec->get_memory_loc(),
+                newVarRec->get_base_addr_reg(),
+                "Store the absolute address in the dereferenced variable loc.");
+
+            // Mark this as a reference variable.
+            newVarRec->set_is_reference(true);
+
+            // Restore the registers we swept off earlier.
+            cg.restore_regs();
+
+            // Clear the index list
+            array_deref_indexes.clear();
 
             $$ = newVarRec;
+
+            if (tmDebugFlag)
+            {
+                cg.emit_note("------- END ARRAY DEREFERENCE --------");
+            }
         }
         else
         {
             // This was not an array dereference just a basic
             // type so just return the variable record.
-            $$ = tempVar;
+            $$ = targetVar;
         }
         }
       ;
 
 lvalue2:
        /* empty rule */     { $$ = 0; }
-      | TK_LBRACK exp TK_RBRACK lvalue2 {
+      | TK_LBRACK exp TK_RBRACK lvalue2 
+    {
         // Array dereference; exp must be int.
         if (!is_int($<var_rec>2->get_type()))
         {
@@ -1483,17 +1724,19 @@ lvalue2:
             exit(0);
         }
 
+        // Store the variable representing the array index.
+        // NOTE: This doesn't need to be a stack because exp already
+        //      ran by the time this rule runs so even in multiple dim
+        //      arrays they should not collide.
+        array_deref_indexes.push_front($<var_rec>2);
+
         // Construct an array type record.
         // The size is irrelevant. Only used for # of dims test.
         // The primitive subtype will be null which is ok too
         // because the lvalue.TK_ID lookup will determine the sub.
-        // TODO: For code gen the int is the index and is needed.
-        //      I may need to add a new container class to handle
-        //      passing values(s-lits, int-lits, var names, proc
-        //      names)
         $$ = new TypeRec("anonymous", arrayI9, $<type_rec>4, 1);
-        }
-      ;
+    }
+    ;
 
 exp:
    lvalue
@@ -1517,7 +1760,7 @@ exp:
 
             // Look up the int type.
             TypeRec *target_type = sm->lookup_type("int");
-            $$ = new VarRec("@int_literal", target_type, true, $<str>1);
+            $$ = new VarRec("@int_literal", target_type, true, true, $<str>1);
 
 
             // CODE GEN
@@ -1529,7 +1772,7 @@ exp:
    | TK_TRUE    
     { 
         TypeRec *target_type = sm->lookup_type("bool");
-        $$ = new VarRec("@bool_literal_true", target_type, true, "1");
+        $$ = new VarRec("@bool_literal_true", target_type, true, true, "1");
 
 
         // CODE GEN
@@ -1541,7 +1784,7 @@ exp:
    | TK_FALSE
     { 
         TypeRec *target_type = sm->lookup_type("bool");
-        $$ = new VarRec("@bool_literal_false", target_type, true, "0");
+        $$ = new VarRec("@bool_literal_false", target_type, true, true, "0");
 
 
         // CODE GEN
@@ -1553,7 +1796,7 @@ exp:
    | TK_SLIT    
     { 
         TypeRec *target_type = sm->lookup_type("string");
-        $$ = new VarRec("string_literal", target_type, true, $<str>1);
+        $$ = new VarRec("string_literal", target_type, true, true, $<str>1);
 
         // CODE GEN
         // CODE GEN
@@ -1569,7 +1812,7 @@ exp:
         //      FOR NOW JUST RETURN A KNOWN VALUE THAT CAN BE TESTED.
         //      FOR NOW JUST RETURN A KNOWN VALUE THAT CAN BE TESTED.
         //      FOR NOW JUST RETURN A KNOWN VALUE THAT CAN BE TESTED.
-        $$ = new VarRec("@int_user_lit", target_type, true, "0");
+        $$ = new VarRec("@int_user_lit", target_type, true, true, "0");
 
 
         // CODE GEN
@@ -1609,7 +1852,8 @@ exp:
         TypeRec *target_type = $<var_rec>2->get_type();
 
         // Need a return variable.
-        VarRec *rtn_var = new VarRec("@unary_minus_return", target_type);
+        VarRec *rtn_var = new VarRec("@unary_minus_return", target_type, 
+            is_global_scope());
 
         // Get available register for -1 use.
 //        VarRec *neg_one_var = new VarRec("@neg_one", target_type, true, "-1");
@@ -1648,8 +1892,9 @@ exp:
             // TODO: CHECK OUT RETURN BY REFERENCE FOR RETURN VALUES IN FUNCTIONS.
             //      THE CONSTANT FLAG MIGHT NOT FLY AND CREATING A NEW VARIABLE MIGHT
             //      NOT EITHER.
-            $$ = new VarRec("quest_rtn_val", target_type, true,
-                $<var_rec>2->get_value());
+            // This value should be created in the same scope as the exp variable.
+            $$ = new VarRec("quest_rtn_val", target_type, $<var_rec>2->is_global(), 
+                true, $<var_rec>2->get_value());
         }
         else {
             // TYPE ERROR!
@@ -1688,6 +1933,9 @@ exp:
                     {
                         // The activation record will be created with this
                         // memory location to return the value in.
+                        // TODO: FIGURE OUT THE SCOPE OF THE RETURN VARIABLE.
+                        // TODO: FIGURE OUT THE SCOPE OF THE RETURN VARIABLE.
+                        // TODO: FIGURE OUT THE SCOPE OF THE RETURN VARIABLE.
                         $$ = new VarRec("alias_rtn_val",
                             proc_target->get_return_type());
 
@@ -1781,6 +2029,9 @@ exp:
                 {
                     // The activation record will be created with this
                     // memory location to return the value in.
+                    // TODO: FIGURE OUT THE SCOPE OF THE RETURN VARIABLE.
+                    // TODO: FIGURE OUT THE SCOPE OF THE RETURN VARIABLE.
+                    // TODO: FIGURE OUT THE SCOPE OF THE RETURN VARIABLE.
                     $$ = new VarRec("alias_rtn_val", proc_target->get_return_type());
 
                     // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED.
@@ -1821,7 +2072,7 @@ exp:
     {
         if (are_int_or_boolean($<var_rec>1->get_type(), $<var_rec>3->get_type())) 
         {
-            VarRec *rtn_var = new VarRec("addition_return", $<var_rec>1->get_type());
+            VarRec *rtn_var = new VarRec("addition_return", $<var_rec>1->get_type(), is_global_scope());
 
             // CODE GEN
             // CODE GEN
@@ -1882,7 +2133,8 @@ exp:
     {
         if (are_int($<var_rec>1->get_type(), $<var_rec>3->get_type())) 
         {
-            VarRec *rtn_var = new VarRec("subtr_return", $<var_rec>1->get_type());
+            VarRec *rtn_var = new VarRec("subtr_return", $<var_rec>1->get_type(),
+                is_global_scope());
 
             // Do integer subtraction.
             $$ = rtn_var;
@@ -1922,7 +2174,8 @@ exp:
    | exp TK_STAR exp
     {
         if (are_int_or_boolean($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
-            VarRec *rtn_var = new VarRec("starop_return", $<var_rec>1->get_type());
+            VarRec *rtn_var = new VarRec("starop_return", $<var_rec>1->get_type(),
+                is_global_scope());
 
             // Get the exp register assignments.
             int lhs_reg = cg.assign_left_reg($<var_rec>1, $<var_rec>1->get_memory_loc());
@@ -1965,7 +2218,8 @@ exp:
    | exp TK_SLASH exp
     {
         if (are_int($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
-            VarRec *rtn_var = new VarRec("division_return", $<var_rec>1->get_type());
+            VarRec *rtn_var = new VarRec("division_return", $<var_rec>1->get_type(),
+                is_global_scope());
 
             // Do integer division.
             $$ = rtn_var;
@@ -2004,7 +2258,8 @@ exp:
    | exp TK_MOD exp
     {
         if (are_int($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
-            VarRec *rtn_var = new VarRec("mod_return", $<var_rec>1->get_type());
+            VarRec *rtn_var = new VarRec("mod_return", $<var_rec>1->get_type(),
+                is_global_scope());
 
             // Do integer modulus.
             $$ = rtn_var;
@@ -2051,7 +2306,8 @@ exp:
     {
         if (are_int_or_boolean($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
             // Equal comparison always returns boolean type.
-            VarRec *rtn_var = new VarRec("EQ_return", sm->lookup_type("bool"));
+            VarRec *rtn_var = new VarRec("EQ_return", sm->lookup_type("bool"),
+                is_global_scope());
 
             $$ = rtn_var;
 
@@ -2103,7 +2359,8 @@ exp:
     {
         if (are_int_or_boolean($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
             // Not equal comparison always returns boolean type.
-            VarRec *rtn_var = new VarRec("NEQ_return", sm->lookup_type("bool"));
+            VarRec *rtn_var = new VarRec("NEQ_return", sm->lookup_type("bool"),
+                is_global_scope());
 
             $$ = rtn_var;
 
@@ -2155,7 +2412,8 @@ exp:
     {
         if (are_int($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
             // Greater than comparison always returns boolean type.
-            VarRec *rtn_var = new VarRec("GT_return", sm->lookup_type("bool"));
+            VarRec *rtn_var = new VarRec("GT_return", sm->lookup_type("bool"),
+                is_global_scope());
 
             $$ = rtn_var;
 
@@ -2207,7 +2465,8 @@ exp:
     {
         if (are_int($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
             // Less than comparison always returns boolean type.
-            VarRec *rtn_var = new VarRec("LT_return", sm->lookup_type("bool"));
+            VarRec *rtn_var = new VarRec("LT_return", sm->lookup_type("bool"),
+                is_global_scope());
 
             $$ = rtn_var;
 
@@ -2259,7 +2518,8 @@ exp:
     {
         if (are_int($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
             // Greater than equal comparison always returns boolean type.
-            VarRec *rtn_var = new VarRec("GE_return", sm->lookup_type("bool"));
+            VarRec *rtn_var = new VarRec("GE_return", sm->lookup_type("bool"),
+                is_global_scope());
 
             $$ = rtn_var;
 
@@ -2311,7 +2571,8 @@ exp:
     {
         if (are_int($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
             // Less than or equal comparison always returns boolean type.
-            VarRec *rtn_var = new VarRec("LE_return", sm->lookup_type("bool"));
+            VarRec *rtn_var = new VarRec("LE_return", sm->lookup_type("bool"),
+                is_global_scope());
 
             $$ = rtn_var;
 

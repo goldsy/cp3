@@ -39,10 +39,6 @@ CodeGenerator::CodeGenerator()
 
     _reg_assign.push(reg_assign);
 
-    // TODO: GET RID OF THE ROUND ROBIN REG ASSIGNMENT STUFF. ALWAYS SPILL.
-    // Don't use register 0.
-    //_next_assignment = 1;
-
     // Set the initial variable offset for globals.
     //_offset_stack.push(INIT_FRAME_OFFSET);
     _next_frame_offset = INIT_FRAME_OFFSET;
@@ -119,8 +115,7 @@ int CodeGenerator::emit_init_int(int data, string note)
     if (in_proc_defn_flag)
     {
         // We're in a procedure, advancing through a frame.
-        target_addr_offset = _next_frame_offset;
-        ++_next_frame_offset;
+        target_addr_offset = get_frame_offset(1);
 
         emit_load_immed(IMMED_REG, data, "Loading immediate to store in frame mem.");
 
@@ -152,14 +147,32 @@ int CodeGenerator::emit_init_str(string data, string note)
 {
     // TODO: DO SOMETHING LIKE THE INT INIT ABOVE.
     // Store the target data address. This is logical because TM does this for us.
-    int target_addr = _next_data_addr;
 
-    // Advance the next address by the size of the string.
-    _next_data_addr += note.length();
+    int target_addr_offset;
 
-    _output_file << ".DATA " << data << NOTE_PADDING << note << endl;
+    if (in_proc_defn_flag)
+    {
+//        // We're in a procedure, advancing through a frame.
+//        target_addr_offset = get_frame_offset(1);
+//
+//        emit_load_immed(IMMED_REG, data, "Loading immediate to store in frame mem.");
+//
+//        // Store the memory location defined by the offset and
+//        // the current frame pointer value.
+//        emit_store_mem(IMMED_REG, target_addr_offset, FP_REG, 
+//                "Storing immediate to frame memory.");
+    }
+    else
+    {
+        target_addr_offset = _next_data_addr;
 
-    return target_addr;
+        // Advance the next address by the size of the string.
+        _next_data_addr += note.length();
+
+        _output_file << ".DATA " << data << NOTE_PADDING << note << endl;
+    }
+
+    return target_addr_offset;
 }
 
 
@@ -303,19 +316,7 @@ int CodeGenerator::emit_load_value(
         string note
         )
 {
-    //int target_line = get_curr_line();
-
-    //_output_file << get_fmt_curr_line();
-
-    //_output_file << "LDA";
     return emit_displacement_fmt("LDA", result_reg, lhs_value, rhs_reg, note);
-
-    //_output_file << " " << result_reg << ", " << lhs_value << "("
-    //    << rhs_reg << ")" << endl;
-
-    //++_curr_line_num;
-
-    //return target_line;
 }
 
 
@@ -479,14 +480,30 @@ int CodeGenerator::assign_l_or_r_reg(int reg_num, VarRec *source, int rel_addr)
     }
     else
     {
-        // TODO: THIS NEEDS TO BE UPDATED TO CHECK FOR GLOBAL AND USE FP OR ZERO REG.
-        // TODO: THIS NEEDS TO BE UPDATED TO CHECK FOR GLOBAL AND USE FP OR ZERO REG.
-        // TODO: THIS NEEDS TO BE UPDATED TO CHECK FOR GLOBAL AND USE FP OR ZERO REG.
-        // TODO: THIS NEEDS TO BE UPDATED TO CHECK FOR GLOBAL AND USE FP OR ZERO REG.
-        // TODO: THIS NEEDS TO BE UPDATED TO CHECK FOR GLOBAL AND USE FP OR ZERO REG.
-        emit_load_mem(reg_num, rel_addr, ZERO_REG,
+        int base_addr_reg = ZERO_REG;
+
+        // Determine if this variable is global or local.
+        if (source->is_global())
+        {
+            base_addr_reg = ZERO_REG;
+        }
+        else
+        {
+            base_addr_reg = FP_REG;
+        }
+
+        emit_load_mem(reg_num, rel_addr, base_addr_reg,
                 "LOADING var " + source->get_name() + " to reg num " +
                 fmt_int(reg_num));
+
+        // If this is a reference, add another load to get value pointed to
+        // by the reference just loaded.
+        if (source->is_reference())
+        {
+            emit_note("Var " + source->get_name() + " is a reference.");
+            emit_load_mem(reg_num, 0, reg_num,
+                    "Loading value from reference location");
+        }
 
         _reg_assign.top()[reg_num] = make_pair(source, rel_addr);
 
@@ -506,19 +523,80 @@ void CodeGenerator::assign_to_ac(VarRec *source)
 // This method will spill the specified register back to memory.
 void CodeGenerator::spill_register(int reg_num)
 {
-    // TODO: THIS NEEDS TO BE UPDATED TO CHECK FOR GLOBAL AND USE FP OR ZERO REG.
-    // TODO: THIS NEEDS TO BE UPDATED TO CHECK FOR GLOBAL AND USE FP OR ZERO REG.
-    // TODO: THIS NEEDS TO BE UPDATED TO CHECK FOR GLOBAL AND USE FP OR ZERO REG.
-    // TODO: THIS NEEDS TO BE UPDATED TO CHECK FOR GLOBAL AND USE FP OR ZERO REG.
-    // TODO: THIS NEEDS TO BE UPDATED TO CHECK FOR GLOBAL AND USE FP OR ZERO REG.
     // Get all of the info needed to get it back into memory.
     VarRec *target_var = _reg_assign.top()[reg_num].first;
 
     int target_offset = _reg_assign.top()[reg_num].second;
 
     // Check if this is a global or local variable.
-    // TODO: CHECK GLOBAL/LOCAL
-    emit_store_mem(reg_num, target_offset, ZERO_REG,
-            "Spilling var: " + target_var->get_name() + " to memory d=" +
-            fmt_int(target_offset));
+    int base_addr_reg = target_var->get_base_addr_reg();
+    string fmt_base_reg;
+
+    // Determine if this variable is global or local.
+    if (base_addr_reg == ZERO_REG)
+    {
+        fmt_base_reg = "ZERO_REG";
+    }
+    else if (base_addr_reg == FP_REG)
+    {
+        fmt_base_reg = "FP_REG";
+    }
+    else
+    {
+        fmt_base_reg = "**** ERROR: VAR SAID IT IS NEITHER A GLOBAL OR LOCAL ****";
+    }
+
+    if (target_var->is_reference())
+    {
+        emit_load_mem(IMMED_REG, target_offset, base_addr_reg,
+                "Loading reference address.");
+
+        emit_store_mem(reg_num, 0, IMMED_REG,
+                "Spilling reference var: " + target_var->get_name() + 
+                " to memory d= 0, address in IMMED reg.");
+    }
+    else
+    {
+        emit_store_mem(reg_num, target_offset, base_addr_reg,
+                "Spilling var: " + target_var->get_name() + " to memory d=" +
+                fmt_int(target_offset) + " " + fmt_base_reg);
+    }
+}
+
+
+// This method returns the next frame offset and advances the frame offset
+// by the size needed to store the desired information.
+int CodeGenerator::get_frame_offset(int size)
+{
+    int target_offset = _next_frame_offset;
+
+    _next_frame_offset += size;
+
+    return target_offset;
+}
+
+
+void CodeGenerator::save_regs()
+{
+    // We reserved the first 6 mem locations to make this easy.
+    // NOTE: Doesn't work for save state between frames.
+    emit_store_mem(1, 1, ZERO_REG, "Save reg 1 state.");
+    emit_store_mem(2, 2, ZERO_REG, "Save reg 2 state.");
+    emit_store_mem(3, 3, ZERO_REG, "Save reg 3 state.");
+    emit_store_mem(4, 4, ZERO_REG, "Save reg 4 state.");
+    emit_store_mem(5, 5, ZERO_REG, "Save reg 5 state.");
+    emit_store_mem(6, 6, ZERO_REG, "Save reg 6 state.");
+}
+
+
+void CodeGenerator::restore_regs()
+{
+    // We reserved the first 6 mem locations to make this easy.
+    // NOTE: Doesn't work for save state between frames.
+    emit_load_mem(1, 1, ZERO_REG, "Restore reg 1 state.");
+    emit_load_mem(2, 2, ZERO_REG, "Restore reg 2 state.");
+    emit_load_mem(3, 3, ZERO_REG, "Restore reg 3 state.");
+    emit_load_mem(4, 4, ZERO_REG, "Restore reg 4 state.");
+    emit_load_mem(5, 5, ZERO_REG, "Restore reg 5 state.");
+    emit_load_mem(6, 6, ZERO_REG, "Restore reg 6 state.");
 }
