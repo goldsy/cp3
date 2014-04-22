@@ -30,6 +30,9 @@ class ProcRec {
         // Location in memory.
         int _memory_loc;
 
+        // Frame size.
+        int _frame_size;
+
 
     public:
         // Default ctor.
@@ -42,12 +45,16 @@ class ProcRec {
         void set_param_list(list<VarRec *> *source);
         void set_return_type(TypeRec *source);
         void set_is_forward(bool flag);
+        void set_memory_loc(int mem_loc);
+        void set_frame_size(int frame_size);
 
         // Getters
         string get_name();
         list<VarRec *>* get_param_list();
         TypeRec* get_return_type();
         bool get_is_forward();
+        int get_memory_loc();
+        int get_frame_size();
 
         // Type equivalence operator
         bool equal(ProcRec *rhs);

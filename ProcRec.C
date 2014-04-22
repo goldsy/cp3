@@ -17,6 +17,7 @@ ProcRec::ProcRec(
     _param_list = param_list;
     _is_forward_decl = is_forward;
     _memory_loc = 0;
+    _frame_size = 0;
 }
 
 
@@ -36,6 +37,18 @@ void ProcRec::set_return_type(TypeRec *source)
 void ProcRec::set_is_forward(bool flag)
 {
     _is_forward_decl = flag;
+}
+
+
+void ProcRec::set_memory_loc(int mem_loc)
+{
+    _memory_loc = mem_loc;
+}
+
+
+void ProcRec::set_frame_size(int frame_size)
+{
+    _frame_size = frame_size;
 }
 
 
@@ -62,6 +75,20 @@ TypeRec* ProcRec::get_return_type()
 bool ProcRec::get_is_forward()
 {
     return _is_forward_decl;
+}
+
+
+//
+int ProcRec::get_memory_loc()
+{
+    return _memory_loc;
+}
+
+
+//
+int ProcRec::get_frame_size()
+{
+    return _frame_size;
 }
 
 

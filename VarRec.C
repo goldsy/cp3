@@ -28,7 +28,14 @@ VarRec::VarRec(
     _global_flag = global_flag;
 
     // Init this one to false. No ctor param.
-    _reference_flag = false;
+    if (var_type->is_array())
+    {
+        _reference_flag = true;
+    }
+    else
+    {
+        _reference_flag = false;
+    }
 }
 
 

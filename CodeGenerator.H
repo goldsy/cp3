@@ -144,13 +144,16 @@ class CodeGenerator {
         int emit_load_immed(int result_reg, int value, string note);
 
         // This emit is used to load value from reg + displacement.
-        int emit_load_value(int result_reg, int lhs_value, int rhs_reg, string note);
+        int emit_load_value(int result_reg, int lhs_value, int rhs_reg, 
+                string note, int bk_patch_line = -1);
 
         // This emit is used to load from data memory to register.
-        int emit_load_mem(int result_reg, int lhs_value, int rhs_reg, string note);
+        int emit_load_mem(int result_reg, int lhs_value, int rhs_reg, 
+                string note, int bk_patch_line = -1);
 
         // This emit is used to store to data memory from result register.
-        int emit_store_mem(int result_reg, int lhs_value, int rhs_reg, string note);
+        int emit_store_mem(int result_reg, int lhs_value, int rhs_reg, 
+                string note, int bk_patch_line = -1);
 
         // This emit is used for jumps.
         int emit_jump(TmOp code, int test_reg, int lhs_value, 
@@ -159,6 +162,9 @@ class CodeGenerator {
         // This just emits a comment. No line number change.
         void emit_note(string note);
 
+        // This just emits a noop.
+        int emit_noop(string note, int bk_patch_line = -1);
+
         // Report when something seriously went wrong.
         void error(TmOp code, string funct);
 
@@ -166,13 +172,22 @@ class CodeGenerator {
         // This function assigns the specified variable to the left register.
         // There is a check if the variable is assigne to the accumulator which
         // preempts the assignment and just uses the AC.
-        int assign_left_reg(VarRec *source, int rel_addr = 0);
+        int assign_left_reg(VarRec *source, int rel_addr = 0, 
+                int bk_patch_line = -1);
 
         // Same assign_left_req() function except it does it for the right.
-        int assign_right_reg(VarRec *source, int rel_addr = 0);
+        int assign_right_reg(VarRec *source, int rel_addr = 0, 
+                int bk_patch_line = -1);
 
         // Common call for assign left or assign right.
-        int assign_l_or_r_reg(int reg_num, VarRec *source, int rel_addr);
+        int assign_l_or_r_reg(int reg_num, VarRec *source, int rel_addr,
+                int bk_patch_line = -1);
+
+
+        // Advances the bk_patch line number of valid.
+        // For use in functions with more than one back patch instruction.
+        int advance_back_patch_line(int curr_bp_line);
+
 
         // This method assigns the specified variable record to the AC register.
         void assign_to_ac(VarRec *source);
@@ -188,6 +203,9 @@ class CodeGenerator {
 
         // Restores the register states after quick and dirty calculations.
         void restore_regs();
+
+        // This method resets the frame offset.
+        int reset_frame_offset();
 };
 
 #endif      /* CODEGENERATOR_H */

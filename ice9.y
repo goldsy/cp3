@@ -78,6 +78,152 @@ stack<deque<BkPatch> > dofa_jump_end_stack;
 //stack<BkPatch> dofa_jump_top_stack;
 stack<int> dofa_jump_top_stack;
 
+// Line number to jump to in order to skip the proc definition.
+int skip_proc_line;
+
+// Line number where the proc starts. Book keeping thing while declaring the proc.
+int proc_line_start;
+
+// The current proc being declared. Makes it visible between rules.
+ProcRec *curr_proc_rec;
+
+// Stucture for back patching if statements.
+typedef struct BkPatchProc {
+    list<VarRec*> *param_list;
+    VarRec* return_var;
+    int line_num;
+    int control_link;
+    string note;
+} BkPatchProc;
+
+map<ProcRec *, deque<BkPatchProc> > proc_ar_backpatches;
+
+
+
+// This function emits the code for the intial part of the AR.
+void init_ar(ProcRec *target_proc, list<VarRec *> *called_params, VarRec *return_var,
+    int control_link, string note, int bk_patch_line = -1)
+{
+    // Load future value of the FP into the stride register (its an available reg).
+    cg.emit_load_value(STRIDE_REG, -target_proc->get_frame_size(), FP_REG,
+        "Loading the next value of the FP to a register.", bk_patch_line);
+
+    if (bk_patch_line != -1)
+    {
+        ++bk_patch_line;
+    }
+
+    // Emit the frame size into the AR.
+    cg.emit_load_value(IMMED_REG, target_proc->get_frame_size(), ZERO_REG,
+        "Load the frame size into the immediate reg.", bk_patch_line);
+
+    if (bk_patch_line != -1)
+    {
+        ++bk_patch_line;
+    }
+
+    // Init the ar offset.
+    int ar_offset = 1;
+
+    // Frame size is always in position 1.
+    cg.emit_store_mem(IMMED_REG, ar_offset, STRIDE_REG,
+        "Store the frame size into the AR.", bk_patch_line);
+
+    ++ar_offset;
+
+    if (bk_patch_line != -1)
+    {
+        ++bk_patch_line;
+    }
+
+
+    // Emit the AC state into the AR.
+    cg.emit_store_mem(AC_REG, ar_offset, STRIDE_REG,
+        "Store the AC state into the AR.", bk_patch_line);
+
+    ++ar_offset;
+
+    if (bk_patch_line != -1)
+    {
+        ++bk_patch_line;
+    }
+
+
+    // Emit the Control Line/Return PC into the AR.
+    cg.emit_load_value(IMMED_REG, control_link, ZERO_REG,
+        "Load the control link into the immediate reg.", bk_patch_line);
+
+    if (bk_patch_line != -1)
+    {
+        ++bk_patch_line;
+    }
+
+    cg.emit_store_mem(IMMED_REG, ar_offset, STRIDE_REG,
+        "Store the Control Link/Return PC into the AR.", bk_patch_line);
+
+    ++ar_offset;
+
+    if (bk_patch_line != -1)
+    {
+        ++bk_patch_line;
+    }
+
+
+    // Emit each of the parameters.
+    if (called_params)
+    {
+        int lhs;
+
+        for (list<VarRec *>::iterator iter = called_params->begin();
+             iter != called_params->end();
+             ++iter
+            )
+        {
+            // Assign the variable to a register.
+            lhs = cg.assign_left_reg((*iter), (*iter)->get_memory_loc(), bk_patch_line);
+
+            // All assignments take two instructions (by design).
+            if (bk_patch_line != -1)
+            {
+                ++bk_patch_line;
+                ++bk_patch_line;
+            }
+
+            // Emit the store.
+            cg.emit_store_mem(lhs, ar_offset, STRIDE_REG,
+                "Storing parameter value into AR.", bk_patch_line);
+
+            if (bk_patch_line != -1)
+            {
+                ++bk_patch_line;
+            }
+
+            ++ar_offset;
+        }
+    }
+
+    
+    // Emit the return variable absolute address.
+    if (return_var)
+    {
+        // Calculate the absolute address of the return variable.
+        cg.emit_load_value(IMMED_REG, return_var->get_memory_loc(), 
+            return_var->get_base_addr_reg(),
+            "Load the address of the return var into the immediate reg.", 
+            bk_patch_line);
+
+        if (bk_patch_line != -1)
+        {
+            ++bk_patch_line;
+        }
+
+        
+        // Emit the store of the address to the return var ref location.
+        cg.emit_store_mem(IMMED_REG, ar_offset, STRIDE_REG,
+            "Storing return varaible address into AR.", bk_patch_line);
+    }
+}
+
 
 // This is a convenience function so that I don't mess up the not logic
 // in all the places I need to check what scope I'm in.
@@ -85,6 +231,8 @@ bool is_global_scope()
 {
     return (!in_proc_defn_flag);
 }
+
+
 
 
 %}
@@ -574,11 +722,11 @@ declist:
        | declistx
        {
             // Returns the list of variables (i.e. param list) from declistx.
+            list<VarRec*> *scope_vars = $<var_rec_list>1;
+
             if (in_proc_defn_flag)
             {
                 // These variables need to be entered in table now.
-                list<VarRec*> *scope_vars = $<var_rec_list>1;
-
                 if (scope_vars)
                 {
                     // Loop through each variable and add them to the var
@@ -597,13 +745,21 @@ declist:
                             yyerror(errorMsg.c_str());
                             exit(0);
                         }
+
+                        // CODE GEN
+                        // CODE GEN
+                        // CODE GEN
+                        // Each parameter will only ever take 1 location because
+                        // arrays pass by reference. The relative offset needs to be
+                        // recorded.
+                        (*iter)->set_memory_loc(cg.get_frame_offset(1));
                     }
                 }
             }
 
-            proc_var_rec_list = $<var_rec_list>1;
+            proc_var_rec_list = scope_vars;
 
-            $$ = $<var_rec_list>1;
+            $$ = scope_vars;
        }
        ;
 
@@ -617,10 +773,7 @@ declistx:
 
             for (id_iter = $<string_list>1->begin(); id_iter != $<string_list>1->end(); ++id_iter)
             {
-            // TODO: CHECK OUT THE GLOBAL FLAG HERE. NOT SURE WHICH IT SHOULD BE.
-            // TODO: CHECK OUT THE GLOBAL FLAG HERE. NOT SURE WHICH IT SHOULD BE.
-            // TODO: CHECK OUT THE GLOBAL FLAG HERE. NOT SURE WHICH IT SHOULD BE.
-                VarRec *temp = new VarRec(*id_iter, $<type_rec>3);
+                VarRec *temp = new VarRec(*id_iter, $<type_rec>3, is_global_scope());
                 param_list->push_back(temp);
             }
 
@@ -659,6 +812,36 @@ proc:
 
         // We've now exited the scope.
         sm->exit_scope();
+
+
+        // CODE GEN
+        // CODE GEN
+        // CODE GEN
+        // TODO: LOT OF STUFF INCLUDING DOING THE JUMP BACK PATCH AND RETURN HANDLING.
+
+        // Back Patch the Unconditional jump to end of function.
+        cg.emit_load_value(PC_REG, cg.get_curr_line(), ZERO_REG,
+            "Setting jump over function declaration.", skip_proc_line);
+
+        // Set the frame size of the procedure.
+        curr_proc_rec->set_frame_size(cg.reset_frame_offset());
+
+        // Back patch setting the frame pointer.
+        cg.emit_load_value(FP_REG, -curr_proc_rec->get_frame_size(), FP_REG,
+            "Setting the FP to (FP_REG - " + 
+            fmt_int(curr_proc_rec->get_frame_size()) + ")", proc_line_start);
+
+        // TODO: RESTORE THE AC FROM MEMORY. SET THE FP BACK BY FRAME SIZE AND SET PC.
+        // TODO: RESTORE THE AC FROM MEMORY. SET THE FP BACK BY FRAME SIZE AND SET PC.
+        // TODO: RESTORE THE AC FROM MEMORY. SET THE FP BACK BY FRAME SIZE AND SET PC.
+        // TODO: RESTORE THE AC FROM MEMORY. SET THE FP BACK BY FRAME SIZE AND SET PC.
+        // TODO: RESTORE THE AC FROM MEMORY. SET THE FP BACK BY FRAME SIZE AND SET PC.
+        // TODO: RESTORE THE AC FROM MEMORY. SET THE FP BACK BY FRAME SIZE AND SET PC.
+        // TODO: RESTORE THE AC FROM MEMORY. SET THE FP BACK BY FRAME SIZE AND SET PC.
+        // TODO: RESTORE THE AC FROM MEMORY. SET THE FP BACK BY FRAME SIZE AND SET PC.
+
+        // NOTE: Do not delete!!!
+        curr_proc_rec = 0;
     }
     ;
 
@@ -684,6 +867,28 @@ procentry:
 
                 // We've now entered a new scope.
                 sm->enter_scope();
+
+                // CODE GEN
+                // CODE GEN
+                // CODE GEN
+
+                // Queue an unconditional jump to end of function.
+                skip_proc_line = cg.get_curr_line();
+                cg.reserve_lines(1);
+
+                // Store the start line of the proc so the memory location
+                // can be set in the prochelper rule. Don't want to jack up the
+                // semantic stuff so won't try to create one here.
+                proc_line_start = cg.get_curr_line();
+
+                // Reserve a line to change the FP by this functions frame size.
+                // It will be proc_line_start conveniently enough.
+                cg.reserve_lines(1);
+
+                // Reserve 3 locations for Frame Size, AC_REG state, PC_REG return.
+                // These are logically created.  There is no variable for them
+                // I will know that for any proc these will be in 1, 2, and 3.
+                cg.get_frame_offset(3);
             }
          }
          ;
@@ -691,13 +896,15 @@ procentry:
 prochelper:
           /* empty rule */
           {
-            // stuff the return variable in the table.
+            // Stuff the return variable in the table.
             if ($<type_rec>0)
             {
-            // TODO: CHECK OUT THE GLOBAL FLAG HERE. NOT SURE WHICH IT SHOULD BE.
-            // TODO: CHECK OUT THE GLOBAL FLAG HERE. NOT SURE WHICH IT SHOULD BE.
-            // TODO: CHECK OUT THE GLOBAL FLAG HERE. NOT SURE WHICH IT SHOULD BE.
-                VarRec *rtn_var = new VarRec(proc_name, $<type_rec>0);
+                // We check the scope but it will always be local in a proc.
+                VarRec *rtn_var = new VarRec(proc_name, $<type_rec>0, 
+                    is_global_scope());
+
+                // This needs to be treated as a reference variable.
+                rtn_var->set_is_reference(true);
 
                 if ( !sm->insert_var(rtn_var) )
                 {
@@ -745,6 +952,7 @@ prochelper:
                 // Then replace param list with <declist> so names match.
                 // Clean up the old stored list if it exists.
                 list<VarRec *> *stored_params = stored_proc->get_param_list();
+
                 if (stored_params)
                 {
                     list<VarRec *>::iterator stored_iter;
@@ -761,6 +969,11 @@ prochelper:
 
                 // The proc has now been defined.
                 stored_proc->set_is_forward(false);
+
+                // Swap to use the same ptr as a newly defined proc for 
+                // code generation.
+                delete proc_rec;
+                proc_rec = stored_proc;
             }
             else
             {
@@ -776,6 +989,17 @@ prochelper:
             }
 
             proc_var_rec_list = 0;
+
+            // CODE GEN
+            // CODE GEN
+            // CODE GEN
+
+            // Set the start line of the proc as determined in the procentry rule.
+            proc_rec->set_memory_loc(proc_line_start);
+
+            // Store the current proc rec we're working on so we can get to it
+            // elsewhere.  They never nest.
+            curr_proc_rec = proc_rec;
           }
           ;
 
@@ -1634,16 +1858,13 @@ lvalue:
 
 //            cg.emit_math(ADD, IMMED_REG, LHS_REG, IMMED_REG,
 //                "Skipping to last array dimension.");
+            // This intializes the AC.
             cg.emit_math(ADD, AC_REG, LHS_REG, ZERO_REG,
                 "Skipping to last array dimension.");
 
             // Set STRIDE_REG to initial stride of 1.
             cg.emit_load_value(STRIDE_REG, 1, ZERO_REG, 
                 "Init stride reg (3) with a 1.");
-
-            // Set AC to ZERO in case this is a one dimension array.
-//            cg.emit_load_value(AC_REG, 0, ZERO_REG, 
-//                "Init accumulator with a 0.");
 
             array_deref_indexes.pop_back();
 
@@ -1933,15 +2154,9 @@ exp:
                     {
                         // The activation record will be created with this
                         // memory location to return the value in.
-                        // TODO: FIGURE OUT THE SCOPE OF THE RETURN VARIABLE.
-                        // TODO: FIGURE OUT THE SCOPE OF THE RETURN VARIABLE.
-                        // TODO: FIGURE OUT THE SCOPE OF THE RETURN VARIABLE.
                         $$ = new VarRec("alias_rtn_val",
-                            proc_target->get_return_type());
-
-                        // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED.
-                        // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED.
-                        // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED.
+                            proc_target->get_return_type(),
+                            is_global_scope());
                     }
                     else
                     {
@@ -1965,9 +2180,70 @@ exp:
             // CODE GEN
             // CODE GEN
             // CODE GEN
-            // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED IF ONE.
-            // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED IF ONE.
-            // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED IF ONE.
+
+            // Determine number of lines to reserve.
+            // There are no parameters in this type of call.
+            // Start with one for each of frame size, AC state, return PC.
+            int skips = 5;
+
+            // If there is a return value then it will take 2 instructions.
+            if ($$)
+            {
+                skips += 2;
+            }
+
+            int bkpatch_line = cg.get_curr_line();
+
+            cg.reserve_lines(skips);
+
+            if (proc_target->get_frame_size() == 0)
+            {
+                // Either this is a recursive call or a forward that has not yet
+                // been defined.
+                // Defer the init of the frame until we know where to write to.
+                BkPatchProc backpatch;
+
+                backpatch.param_list = 0;
+                backpatch.return_var = $$;
+                backpatch.line_num = bkpatch_line;
+
+                // Return PC will be one after the current line because the last
+                // thing we will do after this is an LDA to "call" the function.
+                backpatch.control_link = (cg.get_curr_line() + 1);
+                backpatch.note = "Back patching a parameterless function.";
+
+                // Use the map to determine if another back patch has been queued.
+                map<ProcRec *, deque<BkPatchProc> >::iterator iter;
+
+                iter = proc_ar_backpatches.find(proc_target);
+
+                if (iter == proc_ar_backpatches.end())
+                {
+                    // No back patches have been queued. Create a new deque
+                    // insert this one and move on.
+                    deque<BkPatchProc> bplist;
+
+                    bplist.push_back(backpatch);
+
+                    proc_ar_backpatches.insert(make_pair(proc_target, bplist));
+                }
+                else
+                {
+                    // Add this one to the list.
+                    iter->second.push_back(backpatch);
+                }
+            }
+            else
+            {
+                // Now we need to back patch the lines we just skipped.
+                init_ar(proc_target, 0, $$, (cg.get_curr_line() + 1),
+                    "Already know the frame size of this parameterless call", 
+                    bkpatch_line);
+            }
+
+            // Last thing to do is make the call to the function.
+            cg.emit_load_value(PC_REG, proc_target->get_memory_loc(), ZERO_REG,
+                "Calling function: " + proc_target->get_name());
         }
    | TK_ID TK_LPAREN expx TK_RPAREN
         {
@@ -2029,23 +2305,99 @@ exp:
                 {
                     // The activation record will be created with this
                     // memory location to return the value in.
-                    // TODO: FIGURE OUT THE SCOPE OF THE RETURN VARIABLE.
-                    // TODO: FIGURE OUT THE SCOPE OF THE RETURN VARIABLE.
-                    // TODO: FIGURE OUT THE SCOPE OF THE RETURN VARIABLE.
-                    $$ = new VarRec("alias_rtn_val", proc_target->get_return_type());
-
-                    // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED.
-                    // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED.
-                    // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED.
+                    $$ = new VarRec("alias_rtn_val", proc_target->get_return_type(),
+                        is_global_scope());
                 }
                 else
                 {
                     // There is no return value.
                     $$ = 0;
                 }
+
+                // CODE GEN
+                // CODE GEN
+                // CODE GEN
+
+                // Determine number of lines to reserve.
+                // Start with one for loading future FP value.
+                // Add 2 for storing frame size, 1 for AC state, 
+                // and 2 for return PC. Total = 5.
+                int skips = 5;
+
+                // It takes 3 instructions to copy each parameter.
+                skips += (param_list->size() * 3);
+
+                // If there is a return value then it will take 2 instructions.
+                if ($$)
+                {
+                    skips += 2;
+                }
+
+                int bkpatch_line = cg.get_curr_line();
+
+                cg.reserve_lines(skips);
+
+                if (proc_target->get_frame_size() == 0)
+                {
+                    // Either this is a recursive call or a forward that has not yet
+                    // been defined.
+                    // Defer the init of the frame until we know where to write to.
+                    BkPatchProc backpatch;
+
+                    backpatch.param_list = param_list;
+                    backpatch.return_var = $$;
+                    backpatch.line_num = bkpatch_line;
+
+                    // Return PC will be one after the current line because the last
+                    // thing we will do after this is an LDA to "call" the function.
+                    backpatch.control_link = (cg.get_curr_line() + 1);
+                    backpatch.note = "Back patching a parametered function.";
+
+                    map<ProcRec *, deque<BkPatchProc> >::iterator iter;
+
+                    iter = proc_ar_backpatches.find(proc_target);
+
+                    if (iter == proc_ar_backpatches.end())
+                    {
+                        // No back patches have been queued. Create a new deque
+                        // insert this one and move on.
+                        deque<BkPatchProc> bplist;
+
+                        bplist.push_back(backpatch);
+
+                        proc_ar_backpatches.insert(make_pair(proc_target, bplist));
+                    }
+                    else
+                    {
+                        // Add this one to the list.
+                        iter->second.push_back(backpatch);
+                    }
+                }
+                else
+                {
+                    // Now we need to back patch the lines we just skipped.
+                    init_ar(proc_target, param_list, $$, (cg.get_curr_line() + 1),
+                        "Already know the frame size of this parametered call", 
+                        bkpatch_line);
+
+                    // The param list has been processed.
+                    // The expx list contains pointers already maintined in
+                    // the type symbol table so we can just throw the list
+                    // away without concern for the pointers.
+                    delete $<var_rec_list>3;
+                }
+
+                // Last thing to do is make the call to the function.
+                cg.emit_load_value(PC_REG, proc_target->get_memory_loc(), ZERO_REG,
+                    "Calling function: " + proc_target->get_name());
             }
             else
             {
+                // The expx list contains pointers already maintined in
+                // the type symbol table so we can just throw the list
+                // away without concern for the pointers.
+                delete $<var_rec_list>3;
+
                 // Proc call not found.
                 string errorMsg;
                 errorMsg = "Proc '";
@@ -2054,19 +2406,6 @@ exp:
                 yyerror(errorMsg.c_str());
                 exit(0);
             }
-
-            // The expx list contains pointers already maintined in
-            // the type symbol table so we can just throw the list
-            // away without concern for the pointers.
-            delete $<var_rec_list>3;
-
-
-            // CODE GEN
-            // CODE GEN
-            // CODE GEN
-            // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED IF ONE.
-            // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED IF ONE.
-            // TODO: THE CALL NEEDS TO BE MADE AND RETURN VALUE PROPOGATED IF ONE.
         }
    | exp TK_PLUS exp
     {

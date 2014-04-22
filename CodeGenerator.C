@@ -313,10 +313,12 @@ int CodeGenerator::emit_load_value(
         int result_reg,
         int lhs_value,
         int rhs_reg,
-        string note
+        string note,
+        int bk_patch_line
         )
 {
-    return emit_displacement_fmt("LDA", result_reg, lhs_value, rhs_reg, note);
+    return emit_displacement_fmt("LDA", result_reg, lhs_value, rhs_reg, 
+            note, bk_patch_line);
 }
 
 
@@ -325,10 +327,12 @@ int CodeGenerator::emit_load_mem(
         int result_reg,
         int lhs_value,
         int rhs_reg,
-        string note
+        string note,
+        int bk_patch_line
         )
 {
-    return emit_displacement_fmt("LD", result_reg, lhs_value, rhs_reg, note);
+    return emit_displacement_fmt("LD", result_reg, lhs_value, rhs_reg, 
+            note, bk_patch_line);
 }
 
 
@@ -337,10 +341,12 @@ int CodeGenerator::emit_store_mem(
         int result_reg,
         int lhs_value,
         int rhs_reg,
-        string note
+        string note,
+        int bk_patch_line
         )
 {
-    return emit_displacement_fmt("ST", result_reg, lhs_value, rhs_reg, note);
+    return emit_displacement_fmt("ST", result_reg, lhs_value, rhs_reg, 
+            note, bk_patch_line);
 }
 
 
@@ -437,6 +443,13 @@ void CodeGenerator::emit_note(string note)
 }
 
 
+// This emit is used to as a no operation.
+int CodeGenerator::emit_noop(string note, int bk_patch_line)
+{
+    return emit_displacement_fmt("LDA", IMMED_REG, 0, IMMED_REG, note, bk_patch_line);
+}
+
+
 // This reports errors.
 void CodeGenerator::error(TmOp code, string funct)
 {
@@ -448,35 +461,47 @@ void CodeGenerator::error(TmOp code, string funct)
 // This function assigns the specified variable to the left register.
 // There is a check if the variable is assigne to the accumulator which
 // preempts the assignment and just uses the AC.
-int CodeGenerator::assign_left_reg(VarRec *source, int rel_addr)
+int CodeGenerator::assign_left_reg(VarRec *source, int rel_addr,
+        int bk_patch_line)
 {
     // This function will load the value and store the values in the
     // register assignment stack.
-    return assign_l_or_r_reg(LHS_REG, source, rel_addr);
+    return assign_l_or_r_reg(LHS_REG, source, rel_addr, bk_patch_line);
 }
 
 
 // Convenience function.
-int CodeGenerator::assign_right_reg(VarRec *source, int rel_addr)
+int CodeGenerator::assign_right_reg(VarRec *source, int rel_addr,
+        int bk_patch_line)
 {
     // This function will load the value and store the values in the
     // register assignment stack.
-    return assign_l_or_r_reg(RHS_REG, source, rel_addr);
+    return assign_l_or_r_reg(RHS_REG, source, rel_addr, bk_patch_line);
 }
 
 
 // This function assigns the specified variable to the left or right register.
 // There is a check if the variable is assigne to the accumulator which
 // preempts the assignment and just uses the AC.
-int CodeGenerator::assign_l_or_r_reg(int reg_num, VarRec *source, int rel_addr)
+int CodeGenerator::assign_l_or_r_reg(int reg_num, VarRec *source, int rel_addr,
+        int bk_patch_line)
 {
+    // NOTE: The advance BP line function leaves the value as -1 and
+    //      advances all others but does not change the parameter.
     int target_reg;
 
-    // If var assigned to the AC use that, otherwise assign to LHS register.
+    // If var assigned to the AC use that, otherwise assign to LHS/RHS register.
     if (_reg_assign.top()[AC_REG].first == source)
     {
         // Already loaded and assigned to AC.
         target_reg = AC_REG;
+
+        // This is to keep the assignment of registers as always 2 instructions.
+        emit_noop("Filling assign to reg. Already assigned to AC (1)", bk_patch_line);
+        bk_patch_line = advance_back_patch_line(bk_patch_line);
+
+        emit_noop("Filling assign to reg. Already assigned to AC (2)", bk_patch_line);
+        bk_patch_line = advance_back_patch_line(bk_patch_line);
     }
     else
     {
@@ -494,15 +519,25 @@ int CodeGenerator::assign_l_or_r_reg(int reg_num, VarRec *source, int rel_addr)
 
         emit_load_mem(reg_num, rel_addr, base_addr_reg,
                 "LOADING var " + source->get_name() + " to reg num " +
-                fmt_int(reg_num));
+                fmt_int(reg_num), bk_patch_line);
+        bk_patch_line = advance_back_patch_line(bk_patch_line);
 
         // If this is a reference, add another load to get value pointed to
         // by the reference just loaded.
-        if (source->is_reference())
+        // Arrays can only be passed by reference.
+        if (source->is_reference() && !source->get_type()->is_array())
         {
             emit_note("Var " + source->get_name() + " is a reference.");
+
+            // Don't need to advance BP line here.  Last instruction.
             emit_load_mem(reg_num, 0, reg_num,
-                    "Loading value from reference location");
+                    "Loading value from reference location", bk_patch_line);
+        }
+        else
+        {
+            // This is to keep the assignment of registers as always 2 instructions.
+            // Don't need to advance BP line here.  Last instruction.
+            emit_noop("Filling assign to reg.", bk_patch_line);
         }
 
         _reg_assign.top()[reg_num] = make_pair(source, rel_addr);
@@ -511,6 +546,18 @@ int CodeGenerator::assign_l_or_r_reg(int reg_num, VarRec *source, int rel_addr)
     }
 
     return target_reg;
+}
+
+
+//
+int CodeGenerator::advance_back_patch_line(int curr_bp_line)
+{
+    if (curr_bp_line != -1)
+    {
+        ++curr_bp_line;
+    }
+
+    return curr_bp_line;
 }
 
 
@@ -599,4 +646,15 @@ void CodeGenerator::restore_regs()
     emit_load_mem(4, 4, ZERO_REG, "Restore reg 4 state.");
     emit_load_mem(5, 5, ZERO_REG, "Restore reg 5 state.");
     emit_load_mem(6, 6, ZERO_REG, "Restore reg 6 state.");
+}
+
+
+int CodeGenerator::reset_frame_offset()
+{
+    // Store the size.  The var points to the next available location.
+    int temp = _next_frame_offset - 1;
+
+    _next_frame_offset = INIT_FRAME_OFFSET;
+    
+    return temp;
 }
