@@ -497,10 +497,12 @@ int CodeGenerator::assign_l_or_r_reg(int reg_num, VarRec *source, int rel_addr,
         target_reg = AC_REG;
 
         // This is to keep the assignment of registers as always 2 instructions.
-        emit_noop("Filling assign to reg. Already assigned to AC (1)", bk_patch_line);
+        emit_noop("NOOP: Filling assign to reg. Already assigned to AC (1)", 
+                bk_patch_line);
         bk_patch_line = advance_back_patch_line(bk_patch_line);
 
-        emit_noop("Filling assign to reg. Already assigned to AC (2)", bk_patch_line);
+        emit_noop("NOOP: Filling assign to reg. Already assigned to AC (2)", 
+                bk_patch_line);
         bk_patch_line = advance_back_patch_line(bk_patch_line);
     }
     else
@@ -537,7 +539,7 @@ int CodeGenerator::assign_l_or_r_reg(int reg_num, VarRec *source, int rel_addr,
         {
             // This is to keep the assignment of registers as always 2 instructions.
             // Don't need to advance BP line here.  Last instruction.
-            emit_noop("Filling assign to reg.", bk_patch_line);
+            emit_noop("NOOP: Filling assign to reg.", bk_patch_line);
         }
 
         _reg_assign.top()[reg_num] = make_pair(source, rel_addr);
@@ -658,3 +660,24 @@ int CodeGenerator::reset_frame_offset()
     
     return temp;
 }
+
+
+void CodeGenerator::enter_scope()
+{
+    vector<pair<VarRec *, int> > reg_assign;
+    reg_assign.resize(6);
+
+    for (int index = 0; static_cast<unsigned int>(index) < reg_assign.size(); ++index)
+    {
+        reg_assign[index] = make_pair(static_cast<VarRec *>(0), 0);
+    }
+
+    _reg_assign.push(reg_assign);
+}
+
+
+void CodeGenerator::exit_scope()
+{
+    _reg_assign.pop();
+}
+

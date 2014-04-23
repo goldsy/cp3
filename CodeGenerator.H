@@ -206,6 +206,12 @@ class CodeGenerator {
 
         // This method resets the frame offset.
         int reset_frame_offset();
+
+        // Pushes a new inited register assignment vector on the stack.
+        void enter_scope();
+
+        // Pops the register assignment vector off of the stack.
+        void exit_scope();
 };
 
 #endif      /* CODEGENERATOR_H */

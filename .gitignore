@@ -30,6 +30,9 @@ tags
 *.9
 *.out
 
+# The zip file of code.
+*.zip
+
 # Tiny Machine executable and tm machine files.
 tm
 *.tm
