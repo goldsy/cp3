@@ -328,6 +328,7 @@ bool is_global_scope()
 %type <intt> elseif
 %type <intt> elseifentry
 %type <intt> ifend
+%type <var_rec> faentry
 %%
 
 /* START */
@@ -514,24 +515,6 @@ varlist:
                             fmt_int(i));
                     }
 
-// TODO: REMOVE AFTER TESTING.
-                    // NOTE THAT THIS NEEDS TO BE DONE FOR INT/BOOL AND STRING.
-//                    if (is_int_or_boolean(target_type->get_primitive()))
-//                    {
-//                        // Interger and boolean case
-//                        // TODO: FINISH INT/BOOL ARRAY ALLOCATION.
-//                        // TODO: FINISH INT/BOOL ARRAY ALLOCATION.
-//                        // TODO: FINISH INT/BOOL ARRAY ALLOCATION.
-//                        cg.emit_note("TODO: INT/BOOL ARRAY ALLOCATION");
-//                    }
-//                    else
-//                    {
-//                        // String case
-//                        // TODO: FINISH STRING ARRAY ALLOCATION.
-//                        // TODO: FINISH STRING ARRAY ALLOCATION.
-//                        // TODO: FINISH STRING ARRAY ALLOCATION.
-//                        cg.emit_note("TODO: STRING ARRAY ALLOCATION");
-//                    }
 
                     if (tmDebugFlag)
                     {
@@ -1243,8 +1226,16 @@ stm:
 
         // Jump to end of function to return which must be back patched.
         // Reserve the line for the unconditional jump to the return block.
-        proc_return_stack.push(cg.get_curr_line());
-        cg.reserve_lines(1);
+        if (is_global_scope())
+        {
+            // This is same as exit in global scope.
+            cg.emit(HALT, "Return in global scope. Same as exit.");
+        }
+        else
+        {
+            proc_return_stack.push(cg.get_curr_line());
+            cg.reserve_lines(1);
+        }
     }
    | lvalue TK_ASSIGN exp TK_SEMI
     {
@@ -1471,7 +1462,6 @@ qjumpnext:
 qjumpend:
     /* empty rule */
     {
-        // TODO: MOVE THIS TO A FUNCTION!!!
         // This rule is used to queue backpatches for jumping to the end
         // of the if stmt block.
         if (tmDebugFlag)
@@ -1517,31 +1507,9 @@ elseif:
         // CODE GEN
         // CODE GEN
         // CODE GEN
-        // TODO: EMIT ELSE-IF STMT HERE.
-        // TODO: EMIT ELSE-IF STMT HERE.
-        // TODO: EMIT ELSE-IF STMT HERE.
         $$ = cg.get_curr_line();
         printf("ELSEIF NESTED %d\n", $<intt>1);
 
-
-
-
-        //if (tmDebugFlag)
-        //{
-        //    cg.emit_note("RESERVE LINE " + fmt_int(cg.get_curr_line()) + 
-        //        " FOR JUMP TO END OF IF BLOCK.");
-        //}
-
-        //BkPatch jump_to_end;
-
-        //// This is an absolute jump so the test register is irrelevant.
-        //jump_to_end.test_reg_num = ZERO_REG;
-        //jump_to_end.line_num = cg.get_curr_line();
-        //jump_to_end.note = "Jump from if or elseif to end of if block.";
-
-        //if_jump_end_stack.push_back(jump_to_end);
-
-        //cg.reserve_lines(1);
     }
    ;
 
@@ -1573,25 +1541,7 @@ dqifjumpnext:
 elseifentry:
         /* empty rule */
     {
-        // TODO: REMOVE AFTER TESTING.
-        // Reserve instructions for if test.
-//        if (tmDebugFlag)
-//        {
-//            cg.emit_note("RESERVE LINE " + fmt_int(cg.get_curr_line()) + 
-//                " FOR IF TEST.");
-//        }
-//
         $$ = cg.get_curr_line();
-//        cg.reserve_lines(1);
-//
-//        // Queue the jump to elseif or else block.
-//        BkPatch ifjump;
-//
-//        ifjump.test_reg_num = cg.assign_left_reg($<var_rec>0, $<var_rec>0->get_memory_loc());
-//        ifjump.line_num = $$;
-//        ifjump.note = "Jump from elseif stmt to elseif, else or end.";
-//
-//        if_jump_next_q.push_back(ifjump);
     }
     ;
 
@@ -1793,7 +1743,6 @@ qdofajumpend:
             fflush(0);
         }
 
-        // TODO: MOVE THIS TO A FUNCTION???
         // This rule is used to queue backpatches for jumping to the end
         // of the do stmt block.
         if (tmDebugFlag)
@@ -1823,13 +1772,115 @@ qdofajumpend:
     ;
 
 fa:
-  TK_FA TK_ID faentry TK_ASSIGN exp TK_TO exp TK_ARROW stms0 TK_AF
-  {
+  TK_FA TK_ID faentry TK_ASSIGN exp TK_TO exp fainit TK_ARROW stms0 TK_AF
+    {
+//        TypeRec *int_rec = sm->lookup_type("int");
+//
+//        // Both expressions must be an int.
+//        if (!int_rec->equal($<var_rec>5->get_type())
+//            || !int_rec->equal($<var_rec>7->get_type()))
+//        {
+//            // Variable undefined.
+//            string errorMsg;
+//            errorMsg = "Invalid fa expression type. Expressions must be int";
+//            yyerror(errorMsg.c_str());
+//            exit(0);
+//        }
+
+        // CODE GEN
+        VarRec *counter_var = $<var_rec>3;
+
+        int lhs = cg.assign_left_reg(counter_var, counter_var->get_memory_loc());
+
+        // Increment the counter.
+        cg.emit_load_value(lhs, 1, lhs, "Increment FA counter.");
+
+        // Dump the register back to memory.
+        cg.spill_register(lhs);
+
+        
+        // Get the top line of the do (Will only ever be one).
+        int top_line = dofa_jump_top_stack.top();
+
+        cg.emit_load_value(PC_REG, top_line, ZERO_REG, 
+            "FA jump back to top of loop.");
+
+        // Remove the jump to top item.
+        dofa_jump_top_stack.pop();
+
+
+        // EMIT THE JUMP TO END*S* CODE HERE. MUST BE AFTER JUMP TO TOP.
+        deque<BkPatch> do_jump_end_q = dofa_jump_end_stack.top();
+
+        while (do_jump_end_q.size() > 0)
+        {
+            // Get the item (Really should only ever be one).
+            BkPatch patch = do_jump_end_q.back();
+
+            cg.emit_jump(JLT, patch.test_reg_num, (cg.get_curr_line() - 
+                patch.line_num - 1), PC_REG, patch.note, patch.line_num);
+
+            // Remove the item.
+            do_jump_end_q.pop_back();
+        }
+
+        if (tmDebugFlag)
+        {
+            cg.emit_note("------- END FA --------");
+        }
+
+        // Leaving fa scope.
+        --fa_count;
+
+        sm->exit_scope();
+        cg.exit_scope();
+
+        // Leaving this fa loop.
+        dofa_jump_end_stack.pop();
+   }
+   ;
+
+faentry:
+       /* empty rule */
+       {
+            sm->enter_scope();
+
+            // CODE GEN
+            cg.enter_scope();
+
+            ++fa_count;
+
+            VarRec *id_rec = new VarRec($<str>0, sm->lookup_type("int"),
+                is_global_scope());
+
+            // CODE GEN
+            if (tmDebugFlag)
+            {
+                cg.emit_note("------- BEGIN FA --------");
+            }
+
+            id_rec->set_memory_loc(cg.emit_init_int(0, 
+                "Allocate FA loop variable."));
+
+            id_rec->set_loop_counter_flag(true);
+            sm->insert_var(id_rec);
+
+            $$ = id_rec;
+       }
+       ;
+
+fainit:
+      /* empty rule */
+    {
         TypeRec *int_rec = sm->lookup_type("int");
 
+        VarRec *counter_var = $<var_rec>-4;
+        VarRec *init_val = $<var_rec>-2;
+        VarRec *until_val = $<var_rec>0;
+
         // Both expressions must be an int.
-        if (!int_rec->equal($<var_rec>5->get_type())
-            || !int_rec->equal($<var_rec>7->get_type()))
+        if (!int_rec->equal(init_val->get_type())
+            || !int_rec->equal(until_val->get_type()))
         {
             // Variable undefined.
             string errorMsg;
@@ -1838,24 +1889,69 @@ fa:
             exit(0);
         }
 
-        // Leaving fa scope.
-        --fa_count;
+        // CODE GEN
+        // CODE GEN
+        // CODE GEN
+        if (tmDebugFlag)
+        {
+            cg.emit_note("Initial value name: " + init_val->get_name());
+            cg.emit_note("Until value name: " + until_val->get_name());
+        }
 
-        sm->exit_scope();
-  }
-  ;
+        // Assign the counter varable to LHS.
+        int lhs = cg.assign_left_reg(counter_var, counter_var->get_memory_loc());
+        int rhs = cg.assign_right_reg(init_val, init_val->get_memory_loc());
 
-faentry:
-       /* empty rule */
-       {
-            sm->enter_scope();
-            ++fa_count;
-            VarRec *id_rec = new VarRec($<str>0, sm->lookup_type("int"),
-                is_global_scope());
-            id_rec->set_loop_counter_flag(true);
-            sm->insert_var(id_rec);
-       }
-       ;
+        // Init counter.
+        cg.emit_load_value(lhs, 0, rhs, "Inited FA counter to value of " +
+            init_val->get_name());
+
+        // Dump the register back to memory.
+        cg.spill_register(lhs);
+
+        // ---------------------------------------------------------------
+        // This is same as dofaentry but it was too hard to reuse it here.
+        // ---------------------------------------------------------------
+        // This is the line we want to jump to when returning for the next check
+        dofa_jump_top_stack.push(cg.get_curr_line());
+
+        cg.emit_note("Storing line " + fmt_int(cg.get_curr_line()) +
+            " as top of fa loop.");
+
+        // We've entered a new fa block.
+        // Create a new queue of jump to end of do/fa.
+        deque<BkPatch> dofa_jump_end_q;
+        dofa_jump_end_stack.push(dofa_jump_end_q);
+        //---------------------------------------------------------------
+
+        // UNTIL_VALUE - COUNTER
+        lhs = cg.assign_right_reg(until_val, until_val->get_memory_loc());
+        rhs = cg.assign_left_reg(counter_var, counter_var->get_memory_loc());
+
+        cg.emit_math(SUB, IMMED_REG, lhs, rhs, "FA test.");
+
+        // ---------------------------------------------------------------
+        // This is same as dofajumpend rule, but again too hard to reuse.
+        // ---------------------------------------------------------------
+        if (tmDebugFlag)
+        {
+            cg.emit_note("RESERVE LINE " + fmt_int(cg.get_curr_line()) + 
+                " FOR JUMP TO END OF DO/FA BLOCK.");
+        }
+
+        BkPatch jump_to_end;
+
+        // Get the test register for the exp variable.
+        jump_to_end.test_reg_num = IMMED_REG;
+        jump_to_end.line_num = cg.get_curr_line();
+        jump_to_end.note = "Jump from fa test to end of fa block.";
+
+        dofa_jump_end_stack.top().push_back(jump_to_end);
+
+        cg.reserve_lines(1);
+    }
+    ;
+
 
 lvalue:
       TK_ID lvalue2    {
@@ -1904,16 +2000,8 @@ lvalue:
             TypeRec *derefType = targetVar->get_type();
             TypeRec *typeLocator = $<type_rec>2;
 
-            // TODO: CLEANUP DEBUG STATEMENTS AFTER TESTING.
-            //int temp = 1;
-            // typeLocator will be null at primitive level.
             do
             {
-                //printf("DO WHILE LOOP%s\n", typeLocator->to_string().c_str(), temp);
-                //printf("DO WHILE LOOP %d\n", temp);
-                //++temp;
-                //fflush(0);
-
                 // Check that deref type exists.
                 if (derefType->get_base_type() != arrayI9)
                 {
@@ -2243,12 +2331,8 @@ exp:
             // Question returns an int type.
             TypeRec *target_type = sm->lookup_type("int");
 
-            // TODO: GIVE THIS SOME THOUGHT.
             // Since true is 1 and false is 0 to convert to an int just
             // copy the variable but changine the type.
-            // TODO: CHECK OUT RETURN BY REFERENCE FOR RETURN VALUES IN FUNCTIONS.
-            //      THE CONSTANT FLAG MIGHT NOT FLY AND CREATING A NEW VARIABLE MIGHT
-            //      NOT EITHER.
             // This value should be created in the same scope as the exp variable.
             $$ = new VarRec("quest_rtn_val", target_type, $<var_rec>2->is_global(), 
                 true, $<var_rec>2->get_value());
@@ -3132,8 +3216,7 @@ exp:
     }
    | TK_LPAREN exp TK_RPAREN    
     { 
-        // TODO: This signifies an immediate evaluation of all exps within these
-        //      parens.
+        // This signifies an immediate evaluation of all exps within these parens.
         $$ = $<var_rec>2; 
     }
    ;

@@ -117,12 +117,12 @@ int CodeGenerator::emit_init_int(int data, string note)
         // We're in a procedure, advancing through a frame.
         target_addr_offset = get_frame_offset(1);
 
-        emit_load_immed(IMMED_REG, data, "Loading immediate to store in frame mem.");
+        emit_load_immed(IMMED_REG, data, "Step 1: Loading int to reg: " + note );
 
         // Store the memory location defined by the offset and
         // the current frame pointer value.
         emit_store_mem(IMMED_REG, target_addr_offset, FP_REG, 
-                "Storing immediate to frame memory.");
+                "Step 2: Storing to frame memory: " + note);
     }
     else
     {
