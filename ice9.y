@@ -2300,6 +2300,8 @@ exp:
         VarRec *rtn_var = new VarRec("@unary_minus_return", target_type, 
             is_global_scope());
 
+        rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
+
         // Get available register for -1 use.
 //        VarRec *neg_one_var = new VarRec("@neg_one", target_type, true, "-1");
 
@@ -2324,6 +2326,9 @@ exp:
 //        cg.emit_load_value(neg_one_reg, -1, ZERO_REG, "Load -1 into register");
         cg.emit_load_value(IMMED_REG, -1, ZERO_REG, "Load -1 into immediate register");
         cg.emit_math(MUL, AC_REG, IMMED_REG, rhs_reg, "Unary minus op");
+
+        // Need to spill in case AC is needed before reference.
+        cg.spill_register(AC_REG);
     }
    | TK_QUEST exp  
     {
@@ -2336,6 +2341,9 @@ exp:
             // This value should be created in the same scope as the exp variable.
             $$ = new VarRec("quest_rtn_val", target_type, $<var_rec>2->is_global(), 
                 true, $<var_rec>2->get_value());
+
+            // Set the memory location of this new type to look at the variable referred to.
+            $$->set_memory_loc($<var_rec>2->get_memory_loc());
         }
         else {
             // TYPE ERROR!
@@ -2671,6 +2679,8 @@ exp:
             // CODE GEN
             // CODE GEN
             // CODE GEN
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
+
             int lhs_reg = cg.assign_left_reg($<var_rec>1, $<var_rec>1->get_memory_loc());
             int rhs_reg = cg.assign_right_reg($<var_rec>3, $<var_rec>3->get_memory_loc());    
 
@@ -2715,6 +2725,9 @@ exp:
             }
 
             $$ = rtn_var;
+
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
         }
         else 
         {
@@ -2729,6 +2742,8 @@ exp:
         {
             VarRec *rtn_var = new VarRec("subtr_return", $<var_rec>1->get_type(),
                 is_global_scope());
+
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
 
             // Do integer subtraction.
             $$ = rtn_var;
@@ -2753,6 +2768,9 @@ exp:
             // Do integer subtraction.
             cg.emit_math(SUB, AC_REG, lhs_reg, rhs_reg, "BINARY MINUS INT OP");
 
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
+
             if (tmDebugFlag)
             {
                 cg.emit_note("------- END INT SUBTRACTION ---------");
@@ -2770,6 +2788,8 @@ exp:
         if (are_int_or_boolean($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
             VarRec *rtn_var = new VarRec("starop_return", $<var_rec>1->get_type(),
                 is_global_scope());
+
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
 
             // Get the exp register assignments.
             int lhs_reg = cg.assign_left_reg($<var_rec>1, $<var_rec>1->get_memory_loc());
@@ -2802,6 +2822,9 @@ exp:
             }
 
             $$ = rtn_var;
+
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
         }
         else {
             // TYPE ERROR!
@@ -2814,6 +2837,8 @@ exp:
         if (are_int($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
             VarRec *rtn_var = new VarRec("division_return", $<var_rec>1->get_type(),
                 is_global_scope());
+
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
 
             // Do integer division.
             $$ = rtn_var;
@@ -2842,6 +2867,9 @@ exp:
             {
                 cg.emit_note("------- END INT DIVISION ---------");
             }
+
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
         }
         else {
             // TYPE ERROR!
@@ -2854,6 +2882,8 @@ exp:
         if (are_int($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
             VarRec *rtn_var = new VarRec("mod_return", $<var_rec>1->get_type(),
                 is_global_scope());
+
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
 
             // Do integer modulus.
             $$ = rtn_var;
@@ -2885,6 +2915,9 @@ exp:
             cg.emit_math(SUB, AC_REG, lhs_reg, AC_REG, 
                 "MOD OP - Step 3 Sub #2 from numerator.");
 
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
+
             if (tmDebugFlag)
             {
                 cg.emit_note("------- END INT MOD ---------");
@@ -2902,6 +2935,8 @@ exp:
             // Equal comparison always returns boolean type.
             VarRec *rtn_var = new VarRec("EQ_return", sm->lookup_type("bool"),
                 is_global_scope());
+
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
 
             $$ = rtn_var;
 
@@ -2938,6 +2973,9 @@ exp:
             // "Else" values are different set return to 0.
             cg.emit_load_value(AC_REG, 0, ZERO_REG, "Set return val to false 0.");
 
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
+
             if (tmDebugFlag)
             {
                 cg.emit_note("------- END INT/BOOL EQUAL (==) ---------");
@@ -2955,6 +2993,8 @@ exp:
             // Not equal comparison always returns boolean type.
             VarRec *rtn_var = new VarRec("NEQ_return", sm->lookup_type("bool"),
                 is_global_scope());
+
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
 
             $$ = rtn_var;
 
@@ -2991,6 +3031,9 @@ exp:
             // "Else" values are different set return to 0.
             cg.emit_load_value(AC_REG, 0, ZERO_REG, "Set return val to false 0.");
 
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
+
             if (tmDebugFlag)
             {
                 cg.emit_note("------- END INT/BOOL NOT EQUAL (==) ---------");
@@ -3008,6 +3051,8 @@ exp:
             // Greater than comparison always returns boolean type.
             VarRec *rtn_var = new VarRec("GT_return", sm->lookup_type("bool"),
                 is_global_scope());
+
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
 
             $$ = rtn_var;
 
@@ -3044,6 +3089,9 @@ exp:
             // "Else" lhs > rhs set return to 1.
             cg.emit_load_value(AC_REG, 1, ZERO_REG, "Set return val to true 1.");
 
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
+
             if (tmDebugFlag)
             {
                 cg.emit_note("------- END INT GREATER THAN (>) ---------");
@@ -3061,6 +3109,8 @@ exp:
             // Less than comparison always returns boolean type.
             VarRec *rtn_var = new VarRec("LT_return", sm->lookup_type("bool"),
                 is_global_scope());
+
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
 
             $$ = rtn_var;
 
@@ -3097,6 +3147,9 @@ exp:
             // "Else" lhs > rhs set return to 1.
             cg.emit_load_value(AC_REG, 1, ZERO_REG, "Set return val to true 1.");
 
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
+
             if (tmDebugFlag)
             {
                 cg.emit_note("------- END INT LESS THAN (>) ---------");
@@ -3114,6 +3167,8 @@ exp:
             // Greater than equal comparison always returns boolean type.
             VarRec *rtn_var = new VarRec("GE_return", sm->lookup_type("bool"),
                 is_global_scope());
+
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
 
             $$ = rtn_var;
 
@@ -3150,6 +3205,9 @@ exp:
             // "Else" lhs > rhs set return to 1.
             cg.emit_load_value(AC_REG, 1, ZERO_REG, "Set return val to true 1.");
 
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
+
             if (tmDebugFlag)
             {
                 cg.emit_note("------- END INT GREATER THAN EQ (>=) ---------");
@@ -3167,6 +3225,8 @@ exp:
             // Less than or equal comparison always returns boolean type.
             VarRec *rtn_var = new VarRec("LE_return", sm->lookup_type("bool"),
                 is_global_scope());
+
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
 
             $$ = rtn_var;
 
@@ -3202,6 +3262,9 @@ exp:
 
             // "Else" lhs > rhs set return to 1.
             cg.emit_load_value(AC_REG, 1, ZERO_REG, "Set return val to true 1.");
+
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
 
             if (tmDebugFlag)
             {

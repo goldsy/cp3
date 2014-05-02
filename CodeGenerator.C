@@ -566,7 +566,7 @@ int CodeGenerator::advance_back_patch_line(int curr_bp_line)
 // Assign the source variable record to the accumulator.
 void CodeGenerator::assign_to_ac(VarRec *source)
 {
-    _reg_assign.top()[AC_REG] = make_pair(source, 0);
+    _reg_assign.top()[AC_REG] = make_pair(source, source->get_memory_loc());
 }
 
 // This method will spill the specified register back to memory.
