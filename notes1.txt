@@ -1,0 +1,4 @@
+This patch fixes the following tests:
+
+02_bool_literal
+

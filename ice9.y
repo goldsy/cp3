@@ -2324,6 +2324,9 @@ exp:
 //        cg.emit_load_value(neg_one_reg, -1, ZERO_REG, "Load -1 into register");
         cg.emit_load_value(IMMED_REG, -1, ZERO_REG, "Load -1 into immediate register");
         cg.emit_math(MUL, AC_REG, IMMED_REG, rhs_reg, "Unary minus op");
+
+        // Need to spill in case AC is needed before reference.
+        cg.spill_register(AC_REG);
     }
    | TK_QUEST exp  
     {
@@ -2336,6 +2339,9 @@ exp:
             // This value should be created in the same scope as the exp variable.
             $$ = new VarRec("quest_rtn_val", target_type, $<var_rec>2->is_global(), 
                 true, $<var_rec>2->get_value());
+
+            // Set the memory location of this new type to look at the variable referred to.
+            $$->set_memory_loc($<var_rec>2->get_memory_loc());
         }
         else {
             // TYPE ERROR!
@@ -2715,6 +2721,9 @@ exp:
             }
 
             $$ = rtn_var;
+
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
         }
         else 
         {
@@ -2752,6 +2761,9 @@ exp:
 
             // Do integer subtraction.
             cg.emit_math(SUB, AC_REG, lhs_reg, rhs_reg, "BINARY MINUS INT OP");
+
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
 
             if (tmDebugFlag)
             {
@@ -2802,6 +2814,9 @@ exp:
             }
 
             $$ = rtn_var;
+
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
         }
         else {
             // TYPE ERROR!
@@ -2842,6 +2857,9 @@ exp:
             {
                 cg.emit_note("------- END INT DIVISION ---------");
             }
+
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
         }
         else {
             // TYPE ERROR!
@@ -2884,6 +2902,9 @@ exp:
                 "MOD OP - Step 2 Mul #1xDenom");
             cg.emit_math(SUB, AC_REG, lhs_reg, AC_REG, 
                 "MOD OP - Step 3 Sub #2 from numerator.");
+
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
 
             if (tmDebugFlag)
             {
@@ -2938,6 +2959,9 @@ exp:
             // "Else" values are different set return to 0.
             cg.emit_load_value(AC_REG, 0, ZERO_REG, "Set return val to false 0.");
 
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
+
             if (tmDebugFlag)
             {
                 cg.emit_note("------- END INT/BOOL EQUAL (==) ---------");
@@ -2990,6 +3014,9 @@ exp:
 
             // "Else" values are different set return to 0.
             cg.emit_load_value(AC_REG, 0, ZERO_REG, "Set return val to false 0.");
+
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
 
             if (tmDebugFlag)
             {
@@ -3044,6 +3071,9 @@ exp:
             // "Else" lhs > rhs set return to 1.
             cg.emit_load_value(AC_REG, 1, ZERO_REG, "Set return val to true 1.");
 
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
+
             if (tmDebugFlag)
             {
                 cg.emit_note("------- END INT GREATER THAN (>) ---------");
@@ -3096,6 +3126,9 @@ exp:
 
             // "Else" lhs > rhs set return to 1.
             cg.emit_load_value(AC_REG, 1, ZERO_REG, "Set return val to true 1.");
+
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
 
             if (tmDebugFlag)
             {
@@ -3150,6 +3183,9 @@ exp:
             // "Else" lhs > rhs set return to 1.
             cg.emit_load_value(AC_REG, 1, ZERO_REG, "Set return val to true 1.");
 
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
+
             if (tmDebugFlag)
             {
                 cg.emit_note("------- END INT GREATER THAN EQ (>=) ---------");
@@ -3202,6 +3238,9 @@ exp:
 
             // "Else" lhs > rhs set return to 1.
             cg.emit_load_value(AC_REG, 1, ZERO_REG, "Set return val to true 1.");
+
+            // Need to spill in case AC is needed before reference.
+            cg.spill_register(AC_REG);
 
             if (tmDebugFlag)
             {
