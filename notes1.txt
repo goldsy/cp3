@@ -1,4 +1,8 @@
+Added a spill of the AC register to all of the operators.
+Added an assignment of memory address for the boolean question operator.
+
 This patch fixes the following tests:
 
 02_bool_literal
-
+11_binop
+10_binop

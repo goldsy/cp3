@@ -2300,6 +2300,8 @@ exp:
         VarRec *rtn_var = new VarRec("@unary_minus_return", target_type, 
             is_global_scope());
 
+        rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
+
         // Get available register for -1 use.
 //        VarRec *neg_one_var = new VarRec("@neg_one", target_type, true, "-1");
 
@@ -2677,6 +2679,8 @@ exp:
             // CODE GEN
             // CODE GEN
             // CODE GEN
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
+
             int lhs_reg = cg.assign_left_reg($<var_rec>1, $<var_rec>1->get_memory_loc());
             int rhs_reg = cg.assign_right_reg($<var_rec>3, $<var_rec>3->get_memory_loc());    
 
@@ -2739,6 +2743,8 @@ exp:
             VarRec *rtn_var = new VarRec("subtr_return", $<var_rec>1->get_type(),
                 is_global_scope());
 
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
+
             // Do integer subtraction.
             $$ = rtn_var;
 
@@ -2782,6 +2788,8 @@ exp:
         if (are_int_or_boolean($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
             VarRec *rtn_var = new VarRec("starop_return", $<var_rec>1->get_type(),
                 is_global_scope());
+
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
 
             // Get the exp register assignments.
             int lhs_reg = cg.assign_left_reg($<var_rec>1, $<var_rec>1->get_memory_loc());
@@ -2830,6 +2838,8 @@ exp:
             VarRec *rtn_var = new VarRec("division_return", $<var_rec>1->get_type(),
                 is_global_scope());
 
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
+
             // Do integer division.
             $$ = rtn_var;
 
@@ -2872,6 +2882,8 @@ exp:
         if (are_int($<var_rec>1->get_type(), $<var_rec>3->get_type())) {
             VarRec *rtn_var = new VarRec("mod_return", $<var_rec>1->get_type(),
                 is_global_scope());
+
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
 
             // Do integer modulus.
             $$ = rtn_var;
@@ -2923,6 +2935,8 @@ exp:
             // Equal comparison always returns boolean type.
             VarRec *rtn_var = new VarRec("EQ_return", sm->lookup_type("bool"),
                 is_global_scope());
+
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
 
             $$ = rtn_var;
 
@@ -2980,6 +2994,8 @@ exp:
             VarRec *rtn_var = new VarRec("NEQ_return", sm->lookup_type("bool"),
                 is_global_scope());
 
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
+
             $$ = rtn_var;
 
 
@@ -3035,6 +3051,8 @@ exp:
             // Greater than comparison always returns boolean type.
             VarRec *rtn_var = new VarRec("GT_return", sm->lookup_type("bool"),
                 is_global_scope());
+
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
 
             $$ = rtn_var;
 
@@ -3092,6 +3110,8 @@ exp:
             VarRec *rtn_var = new VarRec("LT_return", sm->lookup_type("bool"),
                 is_global_scope());
 
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
+
             $$ = rtn_var;
 
 
@@ -3148,6 +3168,8 @@ exp:
             VarRec *rtn_var = new VarRec("GE_return", sm->lookup_type("bool"),
                 is_global_scope());
 
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
+
             $$ = rtn_var;
 
 
@@ -3203,6 +3225,8 @@ exp:
             // Less than or equal comparison always returns boolean type.
             VarRec *rtn_var = new VarRec("LE_return", sm->lookup_type("bool"),
                 is_global_scope());
+
+            rtn_var->set_memory_loc(cg.emit_init_int(0 , "Storing return variable"));
 
             $$ = rtn_var;
 
