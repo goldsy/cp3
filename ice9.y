@@ -1445,13 +1445,14 @@ qjumpnext:
                 " FOR JUMP TO NEXT IF BLOCK.");
         }
 
-        $$ = cg.get_curr_line();
-        cg.reserve_lines(1);
-
         // Queue the jump to elseif or else block.
         BkPatch ifjump;
 
         ifjump.test_reg_num = cg.assign_left_reg($<var_rec>0, $<var_rec>0->get_memory_loc());
+
+        $$ = cg.get_curr_line();
+        cg.reserve_lines(1);
+
         ifjump.line_num = $$;
         ifjump.note = "Jump from if stmt to elseif, else or ifend.";
 
@@ -1487,7 +1488,11 @@ elseif:
     /* empty rule */
     {
         // Always return zero to indicate no instructions.
-        printf("ELSEIF EMPTY LINE %d\n", cg.get_curr_line());
+        if (debugFlag)
+        {
+            printf("ELSEIF EMPTY LINE %d\n", cg.get_curr_line());
+        }
+
         $$ = 0;
     }
    | elseif TK_BOX qjumpend dqifjumpnext exp qjumpnext elseifentry TK_ARROW stms
@@ -1508,7 +1513,11 @@ elseif:
         // CODE GEN
         // CODE GEN
         $$ = cg.get_curr_line();
-        printf("ELSEIF NESTED %d\n", $<intt>1);
+
+        if (debugFlag)
+        {
+            printf("ELSEIF NESTED %d\n", $<intt>1);
+        }
 
     }
    ;
@@ -1564,7 +1573,7 @@ ifend:
             BkPatch patch = if_jump_end_q.back();
 
             cg.emit_jump(JEQ, patch.test_reg_num, (cg.get_curr_line() - 
-                patch.line_num - 1), PC_REG, patch.note, patch.line_num);
+                patch.line_num ), PC_REG, patch.note, patch.line_num);
 
             // Remove the item.
             if_jump_end_q.pop_back();

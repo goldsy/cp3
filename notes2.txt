@@ -1,0 +1,6 @@
+Relocated back patch line for if stmt test.
+
+This patch fixes the following tests:
+
+300_if
+312_if
