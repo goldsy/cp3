@@ -36,3 +36,6 @@ tags
 # Tiny Machine executable and tm machine files.
 tm
 *.tm
+
+# Exclude any test cases.
+testcases/
