@@ -2416,7 +2416,7 @@ exp:
             // Determine number of lines to reserve.
             // There are no parameters in this type of call.
             // Start with one for each of frame size, AC state, return PC.
-            int skips = 5;
+            int skips = 6;
 
             // If there is a return value then it will take 2 instructions.
             if ($$)
@@ -2572,7 +2572,7 @@ exp:
                 // Start with one for loading future FP value.
                 // Add 2 for storing frame size, 1 for AC state, 
                 // and 2 for return PC. Total = 5.
-                int skips = 5;
+                int skips = 6;
 
                 // It takes 3 instructions to copy each parameter.
                 skips += (called_params->size() * 3);
