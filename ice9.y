@@ -1817,8 +1817,22 @@ fa:
             // Get the item (Really should only ever be one).
             BkPatch patch = do_jump_end_q.back();
 
-            cg.emit_jump(JLT, patch.test_reg_num, (cg.get_curr_line() - 
-                patch.line_num - 1), PC_REG, patch.note, patch.line_num);
+            // Need to know if this is a break because it has to be unconditional jump.
+            string break_marker("'break'");
+            size_t found = patch.note.find(break_marker);
+
+            if (found == string::npos)
+            {
+                // break was not found therefore this is a conditional jump.
+                cg.emit_jump(JLT, patch.test_reg_num, (cg.get_curr_line() - 
+                    patch.line_num - 1), PC_REG, patch.note, patch.line_num);
+            }
+            else
+            {
+                // This is a break, unconditional jump needed.
+                cg.emit_jump(JEQ, patch.test_reg_num, (cg.get_curr_line() - 
+                    patch.line_num - 1), PC_REG, patch.note, patch.line_num);
+            }
 
             // Remove the item.
             do_jump_end_q.pop_back();
