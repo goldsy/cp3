@@ -2082,6 +2082,13 @@ lvalue:
                 index_var->get_base_addr_reg(),
                 "Load the left most array dereference value.");
 
+            // Check if the index value is a reference. If so then another load is needed.
+            if (index_var->is_reference())
+            {
+                cg.emit_load_mem(LHS_REG, 0, LHS_REG,
+                    "Left most array dereference value is reference.");
+            }
+
 //            cg.emit_math(ADD, IMMED_REG, LHS_REG, IMMED_REG,
 //                "Skipping to last array dimension.");
             // This intializes the AC.
@@ -2336,6 +2343,8 @@ exp:
             // This value should be created in the same scope as the exp variable.
             $$ = new VarRec("quest_rtn_val", target_type, $<var_rec>2->is_global(), 
                 true, $<var_rec>2->get_value());
+
+            $$->set_is_reference($<var_rec>2->is_reference());
         }
         else {
             // TYPE ERROR!
